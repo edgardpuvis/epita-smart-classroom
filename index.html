@@ -5,15 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>EPITA Smart Classroom - Audit Visuel par IA</title>
     <link rel="stylesheet" href="style.css" />
-    <!-- Scripts TensorFlow.js & COCO-SSD (jsDelivr) -->
-    <script
-      defer
-      src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"
-    ></script>
-    <script
-      defer
-      src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"
-    ></script>
     <script defer src="app.js"></script>
   </head>
   <body>
@@ -24,12 +15,11 @@
           <div class="brand-icon">🏛️</div>
           <div class="brand-text">
             <h1>EPITA Smart Classroom</h1>
-            <p>Audit visuel intelligent & inventaire automatisé de salle de cours</p>
+            <p>Audit visuel intelligent, inventaire complet & détection d'anomalies de salle</p>
           </div>
         </div>
         <div class="header-badges">
-          <span id="model-status" class="badge wait">Chargement de l'IA...</span>
-          <button id="retry" class="secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;" hidden>Réessayer</button>
+          <span id="model-status" class="badge ok">Vision IA Prête</span>
         </div>
       </div>
     </header>
@@ -42,34 +32,16 @@
         
         <section class="card">
           <div class="card-title">
-            <h2>📷 Studio de Capture & Détection</h2>
-            <span class="card-badge">Vision IA</span>
+            <h2>📷 Studio de Capture & Vision IA</h2>
+            <span class="card-badge">Vision Multimodale</span>
           </div>
 
-          <!-- Choix du moteur IA -->
-          <div class="engine-box">
-            <div class="engine-header">Sélection du modèle de détection :</div>
-            <div class="engine-options">
-              <label class="engine-option">
-                <input type="radio" name="engine" value="coco" checked />
-                <div class="engine-info">
-                  <b>COCO-SSD Optimisé</b>
-                  <span>100% local, privé, sans inscription</span>
-                </div>
-              </label>
-              <label class="engine-option">
-                <input type="radio" name="engine" value="gemini" />
-                <div class="engine-info">
-                  <b>Vision Avancée Gemini</b>
-                  <span>Détecte aussi tableaux & fenêtres (Gratuit)</span>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <!-- Configuration clé Gemini si sélectionné -->
-          <div id="gemini-config" class="gemini-config" hidden>
+          <!-- Configuration clé Vision IA -->
+          <div id="gemini-config" class="gemini-config">
             <div class="gemini-row">
+              <span style="font-size:0.85rem; font-weight:700; color:#1e1b4b; display:flex; align-items:center; gap:0.35rem;">
+                🔑 Clé Vision IA :
+              </span>
               <input
                 type="password"
                 id="gemini-key"
@@ -88,7 +60,7 @@
               >
             </div>
             <p class="hint-small">
-              Tier gratuit (sans CB). La clé est conservée uniquement dans votre navigateur.
+              Tier 100% gratuit Google AI Studio (sans CB requise). La clé reste conservée localement dans votre navigateur.
             </p>
           </div>
 

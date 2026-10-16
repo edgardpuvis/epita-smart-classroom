@@ -1,70 +1,56 @@
 // EPITA Smart Classroom : audit visuel d'une salle de cours
-// Double moteur : COCO-SSD optimisé (navigateur local) + Vision Avancée Gemini Flash (Google AI Studio - Gratuit)
-// Support multi-vues (plusieurs angles pour un même audit) + Historique persistant des audits
+// Moteur d'IA : Vision Multimodale Avancée (Google Gemini Flash - Tier Gratuit Google AI Studio)
+// Détection du mobilier, inventaire, audit de conformité, contrôle d'anomalies de rangement et audit multi-angles
 const $ = (id) => document.getElementById(id);
 
-// Libellés français des classes. La classe "person" est volontairement écartée pour respecter la vie privée.
+// Libellés français des classes d'équipements
 const LABELS = {
   chair: "Chaises",
   "dining table": "Tables et bureaux",
   laptop: "Ordinateurs portables",
-  tv: "Écrans",
+  tv: "Écrans & Moniteurs",
   whiteboard: "Tableaux",
   window: "Fenêtres",
-  couch: "Canapés / Fauteuils",
-  bench: "Bancs / Chaises",
-  desk: "Bureaux",
-  monitor: "Moniteurs / Écrans",
+  backpack: "Sacs à dos",
+  bottle: "Bouteilles & Déchets",
   keyboard: "Claviers",
   mouse: "Souris",
-  "cell phone": "Téléphones",
-  book: "Livres",
-  clock: "Horloges",
-  "potted plant": "Plantes",
-  bottle: "Bouteilles",
-  cup: "Tasses",
-  backpack: "Sacs à dos",
-  remote: "Télécommandes",
 };
 const label = (c) => LABELS[c] || c;
 
-// Couleurs personnalisées par catégorie pour un affichage visuel clair et professionnel
+// Couleurs par catégorie
 const COLORS = {
-  chair: "#2e7d52",        // Vert forêt
-  bench: "#2e7d52",
-  couch: "#2e7d52",
-  "dining table": "#2563eb", // Bleu roi
-  desk: "#2563eb",
-  laptop: "#7c3aed",       // Violet
-  tv: "#d97706",           // Orange
-  monitor: "#d97706",
-  whiteboard: "#0891b2",   // Cyan / Turquoise
-  window: "#ca8a04",       // Ambre
-  default: "#f2c94c",      // Jaune
+  chair: "#10b981",        // Émeraude / Vert
+  bench: "#10b981",
+  "dining table": "#3b82f6", // Bleu
+  desk: "#3b82f6",
+  laptop: "#8b5cf6",       // Violet
+  tv: "#f59e0b",           // Ambre
+  monitor: "#f59e0b",
+  whiteboard: "#06b6d4",   // Cyan
+  window: "#eab308",       // Jaune
+  backpack: "#64748b",     // Gris ardoise
+  bottle: "#f97316",       // Orange
+  default: "#6366f1",
 };
 
-// Configuration théorique modifiable.
-// isGeminiOnly = true : non supporté nativement par COCO-SSD (affiché "Non vérifiable"), mais audité par Gemini.
+// Configuration théorique attendue (toutes vérifiables avec la Vision Multimodale)
 const rules = [
   { name: "Tables et bureaux", cls: "dining table", aliases: ["dining table", "desk"], expected: 10 },
   { name: "Chaises", cls: "chair", aliases: ["chair", "bench", "couch"], expected: 20 },
   { name: "Ordinateurs portables", cls: "laptop", aliases: ["laptop"], expected: 5 },
   { name: "Écrans", cls: "tv", aliases: ["tv", "monitor"], expected: 1 },
-  { name: "Tableau", cls: "whiteboard", aliases: ["whiteboard", "blackboard"], expected: 1, isGeminiOnly: true },
-  { name: "Fenêtres", cls: "window", aliases: ["window"], expected: 2, isGeminiOnly: true },
+  { name: "Tableaux", cls: "whiteboard", aliases: ["whiteboard", "blackboard"], expected: 1 },
+  { name: "Fenêtres", cls: "window", aliases: ["window"], expected: 2 },
 ];
 
-let currentEngine = "coco"; // 'coco' ou 'gemini'
-let model = null,
-  stream = null;
-
-// État de l'audit en cours (Support Multi-Angles)
-let auditViews = [];      // Liste des angles : { id, name, snap, thumbnail, raw, ms, engine, timestamp }
-let activeViewIndex = -1; // Angle actif affiché sur le grand canvas
+let stream = null;
+let auditViews = [];      // Liste des angles : { id, name, snap, thumbnail, raw, ms, timestamp }
+let activeViewIndex = -1; // Vue affichée sur le canvas principal
 let cachedGeminiModel = null;
 const HISTORY_KEY = "epita_smart_classroom_history";
 
-/* ---------- Gestion du statut et modèle ---------- */
+/* ---------- Gestion Clé et Statut ---------- */
 function setModel(text, kind) {
   const b = $("model-status");
   if (!b) return;
@@ -72,24 +58,6 @@ function setModel(text, kind) {
   b.className = "badge " + kind;
 }
 
-async function loadModel() {
-  $("retry").hidden = true;
-  setModel("Chargement de COCO-SSD...", "wait");
-  try {
-    model = await cocoSsd.load({ base: "mobilenet_v2" });
-    if (currentEngine === "coco") {
-      setModel("Modèle prêt (COCO-SSD optimisé)", "ok");
-    }
-  } catch (e) {
-    model = null;
-    if (currentEngine === "coco") {
-      setModel("Le modèle local ne s'est pas chargé. Vérifiez votre connexion.", "err");
-      $("retry").hidden = false;
-    }
-  }
-}
-
-/* ---------- Gestion Clé Gemini (LocalStorage) ---------- */
 function getGeminiKey() {
   return localStorage.getItem("epita_gemini_key") || $("gemini-key").value.trim();
 }
@@ -98,21 +66,21 @@ function saveGeminiKey() {
   const key = $("gemini-key").value.trim();
   if (!key) return msg("Veuillez saisir une clé API valide.");
   localStorage.setItem("epita_gemini_key", key);
-  msg("Clé API Gemini enregistrée localement avec succès !");
+  cachedGeminiModel = null; // reset cache pour retester
+  setModel("Clé Vision IA Prête", "ok");
+  msg("Clé API Gemini enregistrée avec succès dans le navigateur !");
   setTimeout(() => msg(""), 3000);
 }
 
-/* ---------- Caméra ---------- */
 const msg = (t) => {
   $("msg").textContent = t || "";
 };
 
+/* ---------- Caméra ---------- */
 async function startCam() {
   msg("");
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    return msg(
-      "Caméra indisponible : utilisez HTTPS ou localhost, ou importez une image de test.",
-    );
+    return msg("Caméra indisponible : utilisez HTTPS ou localhost, ou importez une photo.");
   }
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -127,8 +95,8 @@ async function startCam() {
   } catch (e) {
     msg(
       e.name === "NotAllowedError"
-        ? "Accès à la caméra refusé. Autorisez-la dans le navigateur ou importez une image de test."
-        : "Aucune caméra utilisable. Importez une image de test.",
+        ? "Accès à la caméra refusé. Autorisez-la dans le navigateur ou importez une photo."
+        : "Aucune caméra utilisable. Importez une photo de test.",
     );
   }
 }
@@ -142,7 +110,7 @@ function stopCam() {
   $("snap").disabled = true;
 }
 
-/* ---------- Appel API Gemini Flash avec Fallback ---------- */
+/* ---------- Appel API Gemini Flash (Tier Gratuit) ---------- */
 async function callGeminiGenerate(apiKey, base64Data, prompt) {
   const requestBody = {
     contents: [
@@ -180,7 +148,7 @@ async function callGeminiGenerate(apiKey, base64Data, prompt) {
         candidateModels.push(...flashModels);
       }
     } catch (e) {
-      console.warn("Échec listModels, utilisation de la liste de secours :", e);
+      console.warn("Échec listModels :", e);
     }
   }
 
@@ -224,59 +192,39 @@ async function callGeminiGenerate(apiKey, base64Data, prompt) {
   throw lastErr || new Error("Aucun modèle Gemini compatible n'a pu être contacté.");
 }
 
-/* ---------- Détection Géométrique des Anomalies (COCO-SSD Local) ---------- */
-function detectGeometricAnomalies(preds) {
-  const tables = preds.filter((p) => p.class === "dining table" || p.class === "desk");
-  const chairs = preds.filter((p) => p.class === "chair" || p.class === "bench" || p.class === "couch");
-
-  chairs.forEach((c) => {
-    const [cx, cy, cw, ch] = c.bbox;
-    const chairBottom = cy + ch;
-    const chairCenterX = cx + cw / 2;
-
-    // 1. Détection : Chaise posée sur une table / bureau
-    for (const t of tables) {
-      const [tx, ty, tw, th] = t.bbox;
-      const isWithinTableX = chairCenterX >= tx - 15 && chairCenterX <= tx + tw + 15;
-      const isBaseOnTable = chairBottom >= ty - 25 && chairBottom <= ty + th * 0.75;
-      const isChairAboveFloor = cy < ty + th * 0.4;
-
-      if (isWithinTableX && isBaseOnTable && isChairAboveFloor) {
-        c.anomaly = "Chaise posée sur la table";
-        break;
-      }
-    }
-
-    // 2. Détection : Chaise renversée ou couchée au sol (largeur > hauteur de 35%)
-    if (!c.anomaly && cw > ch * 1.35 && cw > 35) {
-      c.anomaly = "Chaise renversée ou couchée";
-    }
-  });
-
-  return preds;
-}
-
-async function analyzeGemini(snapCanvas) {
+async function analyzeWithVisionAI(snapCanvas) {
   const apiKey = getGeminiKey();
   if (!apiKey) {
-    throw new Error("Clé API Gemini manquante. Veuillez saisir votre clé gratuite Google AI Studio ci-dessus.");
+    throw new Error("Clé API Vision manquante. Veuillez saisir votre clé gratuite Google AI Studio ci-dessus.");
   }
 
   const base64Data = snapCanvas.toDataURL("image/jpeg", 0.85).split(",")[1];
-  const prompt = `Tu es un système expert de vision par ordinateur pour l'audit et le contrôle qualité d'une salle de classe.
+  const prompt = `Tu es un système expert de vision par ordinateur pour l'audit complet, la conformité et la sécurité d'une salle de classe.
+
+1. DÉTECTION DU MOBILIER & ÉQUIPEMENTS :
 Détecte TOUS les objets visibles appartenant aux catégories suivantes :
 - "chair" : chaises, sièges scolaires, bancs, tabourets
-- "dining table" : tables, bureaux, pupitres
+- "dining table" : tables de cours, bureaux, pupitres
 - "laptop" : ordinateurs portables
 - "tv" : écrans d'ordinateur, moniteurs, télévisions, vidéoprojecteurs
-- "whiteboard" : tableaux blancs, tableaux noirs, tableaux interactifs
+- "whiteboard" : tableaux blancs, tableaux noirs, paperboards
 - "window" : fenêtres visibles
+- "backpack" : sacs à dos, cartables
+- "bottle" : bouteilles, canettes, gobelets
 
-CONTRÔLE DES ANOMALIES & ÉLÉMENTS MAL PLACÉS :
-Pour chaque équipement, vérifie attentivement s'il est mal rangé ou dans une posture anormale :
-- Si une chaise est posée SUR une table ou un bureau (ex: après ménage ou désordre) : indique "anomaly": "Chaise sur la table"
-- Si une chaise est renversée, couchée au sol ou tombée : indique "anomaly": "Chaise renversée"
-- Si l'élément est normalement disposé : indique "anomaly": null
+2. DÉTECTION EXHAUSTIVE DES ANOMALIES D'AGENCEMENT, SÉCURITÉ & PROPRETÉ :
+Analyse chaque objet et la salle pour repérer toute anomalie :
+- "Chaise sur la table" : chaise posée sur un plateau de bureau ou de table
+- "Chaise renversée" : chaise couchée par terre, tombée ou renversée
+- "Fenêtre ouverte" : fenêtre entrouverte ou grande ouverte
+- "Tableau non effacé" : tableau avec des écritures, notes ou dessins non nettoyés
+- "Écran/PC allumé" : ordinateur portable ou moniteur resté allumé sans utilisateur
+- "Allée encombrée / Objet au sol" : sac à dos, câble ou matériel gênant la circulation
+- "Déchet / Récipient abandonné" : bouteille vide, gobelet ou déchet oublié sur table ou sol
+
+Pour chaque objet :
+- Si une anomalie est présente, indique son libellé exact dans "anomaly".
+- Si l'élément est normalement rangé et conforme, indique "anomaly": null.
 
 RÈGLE ÉTHIQUE STRICTE : N'inclus JAMAIS les personnes ("person"). Ignore totalement toute personne présente.
 
@@ -284,14 +232,14 @@ Format de réponse obligatoire : réponds STRICTEMENT avec un objet JSON sans au
 {
   "objects": [
     {
-      "class": "chair" | "dining table" | "laptop" | "tv" | "whiteboard" | "window",
+      "class": "chair" | "dining table" | "laptop" | "tv" | "whiteboard" | "window" | "backpack" | "bottle",
       "score": 0.95,
       "box_2d": [ymin, xmin, ymax, xmax],
-      "anomaly": null | "Chaise sur la table" | "Chaise renversée" | "Mobilier mal rangé"
+      "anomaly": null | "Chaise sur la table" | "Chaise renversée" | "Fenêtre ouverte" | "Tableau non effacé" | "Écran/PC allumé" | "Allée encombrée / Objet au sol" | "Déchet / Récipient abandonné"
     }
   ]
 }
-Chaque valeur dans box_2d est un entier normalisé entre 0 et 1000 ([ymin, xmin, ymax, xmax]). Sois précis et exhaustif sur le mobilier.`;
+Chaque valeur dans box_2d est un entier normalisé entre 0 et 1000 ([ymin, xmin, ymax, xmax]).`;
 
   const data = await callGeminiGenerate(apiKey, base64Data, prompt);
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -345,33 +293,18 @@ async function analyze(src, w, h, customName) {
   const overlay = $("analysis-overlay");
   const overlayTitle = overlay ? overlay.querySelector("b") : null;
   if (overlayTitle) {
-    overlayTitle.textContent = currentEngine === "gemini" 
-      ? "Analyse Gemini Vision en cours..." 
-      : "Analyse COCO-SSD en cours...";
+    overlayTitle.textContent = "Analyse Vision IA & Détection d'anomalies...";
   }
   if (overlay) overlay.hidden = false;
 
   await new Promise((resolve) => setTimeout(resolve, 30));
 
-  let preds = [], ms = 0;
   try {
-    if (currentEngine === "gemini") {
-      setModel("Analyse en cours avec Gemini Flash...", "wait");
-      const t = performance.now();
-      preds = await analyzeGemini(snapCanvas);
-      ms = Math.round(performance.now() - t);
-      setModel("Analyse Gemini terminée avec succès", "ok");
-    } else {
-      if (!model) {
-        throw new Error("Le modèle local n'est pas prêt : veuillez patienter ou recharger.");
-      }
-      setModel("Analyse locale en cours...", "wait");
-      const t = performance.now();
-      const rawPreds = await model.detect(snapCanvas, 100, 0.05);
-      preds = detectGeometricAnomalies(rawPreds);
-      ms = Math.round(performance.now() - t);
-      setModel("Modèle prêt (COCO-SSD optimisé)", "ok");
-    }
+    setModel("Analyse Vision IA en cours...", "wait");
+    const t = performance.now();
+    const preds = await analyzeWithVisionAI(snapCanvas);
+    const ms = Math.round(performance.now() - t);
+    setModel("Vision IA Prête", "ok");
 
     // 3. Ajouter cet angle à l'audit en cours
     const angleNumber = auditViews.length + 1;
@@ -382,7 +315,6 @@ async function analyze(src, w, h, customName) {
       thumbnail: snapCanvas.toDataURL("image/jpeg", 0.6),
       raw: preds.filter((p) => p.class !== "person"),
       ms: ms,
-      engine: currentEngine,
       timestamp: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
     };
 
@@ -423,9 +355,6 @@ function getRuleCount(r, c) {
 }
 
 function status(r, n) {
-  const isVerifiable = currentEngine === "gemini" ? Boolean(r.cls) : Boolean(!r.isGeminiOnly && r.cls);
-  if (!isVerifiable)
-    return { gap: "-", t: "Non vérifiable (modèle)", c: "na", ecart: false };
   if (!auditViews.length) return { gap: "-", t: "En attente", c: "na", ecart: false };
   const gap = n - r.expected;
   if (gap === 0) return { gap: 0, t: "Conforme", c: "ok", ecart: false };
@@ -602,10 +531,9 @@ function render() {
   // 2. Audit de la configuration (global salle)
   let ecarts = 0;
   rules.forEach((r, i) => {
-    const isVerifiable = currentEngine === "gemini" ? Boolean(r.cls) : Boolean(!r.isGeminiOnly && r.cls);
-    const n = isVerifiable ? getRuleCount(r, c) : 0;
+    const n = getRuleCount(r, c);
     const s = status(r, n);
-    r.result = { n: isVerifiable ? n : "-", ...s };
+    r.result = { n, ...s };
     if (s.ecart) ecarts++;
     $("det" + i).textContent = r.result.n;
 
@@ -625,7 +553,7 @@ function render() {
     $("st" + i).className = "status-chip " + s.c;
   });
 
-  // 3. Détection et agrégation des anomalies sur l'ensemble des angles
+  // 3. Détection et agrégation de toutes les anomalies sur l'ensemble des angles
   const allAnomalies = [];
   auditViews.forEach((v) => {
     const vDets = v.raw.filter((p) => p.score >= threshold());
@@ -669,10 +597,7 @@ function render() {
   }
 
   // 4. Tableau de bord KPI
-  const verifiables = rules.filter((r) =>
-    currentEngine === "gemini" ? Boolean(r.cls) : Boolean(!r.isGeminiOnly && r.cls)
-  ).length;
-
+  const verifiables = rules.length;
   let global = ["En attente", "na"];
   if (auditViews.length) {
     global =
@@ -710,16 +635,13 @@ function buildReport() {
     return "Aucune analyse disponible. Capturez un ou plusieurs angles d'abord.";
 
   const { counts: c, totalDets } = getCumulativeAudit();
-  const { ecarts, verifiables, global } = window.__audit;
-  const engineDesc = currentEngine === "gemini"
-    ? "Vision IA Avancée Gemini Flash (Google AI Studio - Gratuit)"
-    : "COCO-SSD optimisé (TensorFlow.js / MobileNet v2)";
+  const { ecarts, allAnomalies, verifiables, global } = window.__audit;
 
   const L = [
     "# Rapport d'audit : EPITA Smart Classroom",
     "",
     `Date : ${new Date().toLocaleString("fr-FR")}`,
-    `Moteur d'IA : ${engineDesc}`,
+    `Moteur d'IA : Vision Multimodale Avancée (Google Gemini Flash)`,
     `Seuil de confiance appliqué : ${Math.round(threshold() * 100)} %`,
     `Nombre d'angles / prises de vue analysés : ${auditViews.length}`,
     "",
@@ -729,7 +651,7 @@ function buildReport() {
     "## Détail des prises de vue",
   ];
 
-  auditViews.forEach((v, idx) => {
+  auditViews.forEach((v) => {
     const vDets = v.raw.filter((p) => p.score >= threshold());
     L.push(`- **${v.name}** (${v.timestamp}) : ${vDets.length} équipement(s) détecté(s) [Inférence : ${v.ms} ms].`);
   });
@@ -761,7 +683,7 @@ function buildReport() {
   L.push(
     "",
     "## Écarts identifiés",
-    `${ecarts} écart(s) sur ${verifiables} règle(s) vérifiable(s). Statut global : ${global}.`,
+    `${ecarts} écart(s) sur ${verifiables} règle(s) vérifiée(s). Statut global : ${global}.`,
   );
   rules
     .filter((r) => r.result.ecart)
@@ -769,13 +691,12 @@ function buildReport() {
       L.push(`- ${r.name} : attendu ${r.expected}, détecté ${r.result.n} (écart : ${r.result.gap}).`),
     );
 
-  const { allAnomalies } = window.__audit;
   L.push(
     "",
     "## Contrôle d'agencement et anomalies de disposition",
   );
   if (allAnomalies && allAnomalies.length) {
-    L.push(`${allAnomalies.length} anomalie(s) de rangement détectée(s) :`);
+    L.push(`${allAnomalies.length} anomalie(s) de rangement ou de sécurité identifiée(s) :`);
     allAnomalies.forEach((a) => {
       L.push(`- **${a.anomaly}** : ${label(a.class)} repérée sur ${a.viewName} (confiance ${a.score} %).`);
     });
@@ -784,24 +705,12 @@ function buildReport() {
     L.push("✓ Aucun mobilier mal placé, renversé ou posé sur une table n'a été détecté.");
   }
 
-  const nonSup = rules
-    .filter((r) => currentEngine === "coco" ? (r.isGeminiOnly || !r.cls) : !r.cls)
-    .map((r) => r.name);
-
   L.push(
     "",
-    "## Catégories non prises en charge",
-    nonSup.length
-      ? `${nonSup.join(", ")} : le modèle COCO-SSD ne reconnaît pas nativement ces catégories. Aucune détection n'est inventée, un contrôle manuel est nécessaire.`
-      : "Toutes les catégories de l'audit sont prises en charge par le moteur d'analyse actuel.",
-  );
-
-  L.push(
-    "",
-    "## Limites de l'analyse & Recommandations",
-    "- L'analyse multi-angles réduit les occultations mais un comptage physique de confirmation reste conseillé.",
-    "- Les objets masqués par des sacs ou sous les tables peuvent nécessiter un angle spécifique.",
-    "- Confirmer les écarts avant toute commande ou décision logistique.",
+    "## Recommandations pour un contrôle complémentaire",
+    "- L'analyse multi-angles réduit considérablement les occultations.",
+    "- Confirmer les écarts physiques éventuels avant toute intervention logistique.",
+    "- S'assurer de la fermeture des fenêtres et de l'extinction des écrans en fin de journée.",
   );
 
   return L.join("\n");
@@ -884,7 +793,7 @@ function saveCurrentAudit() {
     date: new Date().toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }),
     roomName: roomName.trim(),
     viewsCount: auditViews.length,
-    engine: currentEngine === "gemini" ? "Gemini Flash" : "COCO-SSD",
+    engine: "Vision IA Gemini",
     totalDets: totalDets,
     ecartsCount: ecarts,
     globalStatus: global,
@@ -938,24 +847,14 @@ function init() {
     render();
   });
 
-  // Gestion du choix de moteur IA
-  document.querySelectorAll('input[name="engine"]').forEach((radio) => {
-    radio.addEventListener("change", (e) => {
-      currentEngine = e.target.value;
-      const isGemini = currentEngine === "gemini";
-      $("gemini-config").hidden = !isGemini;
-      if (isGemini) {
-        setModel("Mode Vision Gemini Flash actif (Prêt)", "ok");
-      } else {
-        setModel(model ? "Modèle prêt (COCO-SSD optimisé)" : "Chargement de COCO-SSD...", model ? "ok" : "wait");
-      }
-      render();
-    });
-  });
-
   // Sauvegarde clé API Gemini
   const savedKey = localStorage.getItem("epita_gemini_key");
-  if (savedKey) $("gemini-key").value = savedKey;
+  if (savedKey) {
+    $("gemini-key").value = savedKey;
+    setModel("Vision IA Prête", "ok");
+  } else {
+    setModel("Clé Vision requise", "wait");
+  }
   $("save-key").onclick = saveGeminiKey;
 
   // Événements caméra & fichiers
@@ -966,7 +865,6 @@ function init() {
     analyze(v, v.videoWidth, v.videoHeight);
   };
   $("th").oninput = render;
-  $("retry").onclick = loadModel;
   $("reset-audit").onclick = resetAudit;
 
   // Import fichier(s) avec support multi-images simultané
@@ -1015,7 +913,6 @@ function init() {
 
   render();
   renderHistory();
-  loadModel();
 }
 
 window.addEventListener("DOMContentLoaded", init);

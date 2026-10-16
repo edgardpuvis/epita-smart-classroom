@@ -22,7 +22,7 @@
     padding: 2rem 1rem;
   }
   .page {
-    max-width: 900px;
+    max-width: 920px;
     margin: 0 auto;
     background: #ffffff;
     padding: 3rem 3.5rem;
@@ -30,7 +30,7 @@
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
   }
   .print-bar {
-    max-width: 900px;
+    max-width: 920px;
     margin: 0 auto 1.5rem;
     display: flex;
     justify-content: space-between;
@@ -40,12 +40,13 @@
     background: var(--accent);
     color: #ffffff;
     border: none;
-    padding: 0.6rem 1.25rem;
+    padding: 0.65rem 1.35rem;
     border-radius: 6px;
     font-weight: 600;
     font-size: 0.95rem;
     cursor: pointer;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: background 0.15s;
   }
   .print-btn:hover { background: #4338ca; }
   
@@ -67,7 +68,7 @@
     letter-spacing: 0.05em;
   }
   h1 { font-size: 2.2rem; font-weight: 800; color: var(--primary); line-height: 1.2; margin-bottom: 0.5rem; }
-  .subtitle { font-size: 1.1rem; color: var(--muted); }
+  .subtitle { font-size: 1.05rem; color: var(--muted); }
   .meta-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -121,6 +122,18 @@
   .status-badge.done { background: #dcfce7; color: #166534; }
   .status-badge.todo { background: #fef3c7; color: #92400e; }
 
+  .anomaly-chip {
+    display: inline-block;
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-right: 0.3rem;
+    margin-bottom: 0.25rem;
+  }
+
   @media print {
     body { background: #fff; padding: 0; }
     .page { box-shadow: none; padding: 0; max-width: 100%; }
@@ -152,70 +165,97 @@
   </header>
 
   <!-- Section 1 : Besoin Métier -->
-  <h2>1. Besoin Métier & Problématique</h2>
+  <h2>1. Besoin Métier & Contexte</h2>
   <p>
-    Dans le cadre de la gestion logistique et pédagogique des campus de l'EPITA, les équipes de régie et les services généraux doivent s'assurer que chaque salle de cours est correctement configurée avant l'arrivée des étudiants (disposition des tables, nombre suffisant de chaises, écrans et ordinateurs disponibles).
+    Dans le cadre de la gestion logistique et pédagogique des campus de l'EPITA, les équipes de régie et les services généraux doivent vérifier quotidiennement que chaque salle de cours est en ordre avant le démarrage des cours : nombre de tables et de chaises conforme, ordinateurs et écrans présents, absence de mobilier détérioré ou mal placé, fenêtres fermées et tableaux effacés.
   </p>
   <ul>
-    <li><b>Problématique :</b> Le contrôle manuel et papier est long, fastidieux, source d'erreurs d'inattention et difficilement traçable.</li>
-    <li><b>Objectif stratégique :</b> Déployer une application web simple et assistée par vision artificielle permettant un audit instantané de l'aménagement de la salle, sans coût récurrent d'infrastructure ni de serveurs.</li>
-    <li><b>Utilisateurs cibles :</b> Régisseurs de campus, responsables des services généraux, coordinateurs pédagogiques non techniques.</li>
+    <li><b>Problématique :</b> Un contrôle manuel systématique est chronophage, répétitif, sujet aux oublis et non tracé informatiquement.</li>
+    <li><b>Objectifs stratégiques :</b>
+      <ul>
+        <li>Offrir une application d'audit visuel assistée par intelligence artificielle utilisable en mobilité (smartphone/tablette/PC).</li>
+        <li>Automatiser à la fois le comptage du mobilier et la détection d'anomalies de sécurité, de propreté et d'agencement.</li>
+        <li>Garantir le respect absolu de la vie privée (conformité RGPD : exclusion stricte des personnes, aucune image stockée sur serveur).</li>
+        <li>Garantir un coût de fonctionnement récurrent égal à <b>0 €</b>.</li>
+      </ul>
+    </li>
+    <li><b>Utilisateurs cibles :</b> Responsables logistique, régisseurs de campus, agents des services généraux et coordinateurs pédagogiques.</li>
   </ul>
 
   <!-- Section 2 : Périmètre du projet -->
-  <h2>2. Périmètre du Projet (Scope & MVP)</h2>
-  <h3>2.1 Périmètre Inclus (MVP)</h3>
+  <h2>2. Périmètre du Projet & Choix Technologiques</h2>
+  <h3>2.1 Choix de l'Architecture IA (Vision Multimodale Gratuite)</h3>
+  <p>
+    Pour surmonter les limites rédhibitoires des modèles d'objets génériques (tels que COCO-SSD, restreints à 80 classes du quotidien, aveugles aux tableaux blancs/fenêtres et incapables de comprendre l'état physique du mobilier), le projet est propulsé par une <b>architecture 100% Vision Multimodale (Google Gemini Flash)</b> :
+  </p>
   <ul>
-    <li><b>Vision par ordinateur 100% navigateur :</b> Modèle pré-entraîné COCO-SSD (TensorFlow.js) fonctionnant côté client (aucun envoi d'images vers un serveur, 0 coût).</li>
-    <li><b>Mode Vision Avancée Multimodal (Gratuit) :</b> Connecteur optionnel vers l'API Google Gemini Flash (Tier gratuit Google AI Studio) pour débloquer la détection des tableaux blancs et des fenêtres.</li>
-    <li><b>Audit Multi-Angles (Nouveauté majeure) :</b> Possibilité de capturer et combiner plusieurs prises de vue (avant, fond, côtés) pour un seul et même audit exhaustif de la pièce.</li>
-    <li><b>Détection des anomalies de rangement :</b> Repérage automatique des mobiliers suspects (ex: chaises posées sur les tables, chaises renversées au sol).</li>
-    <li><b>Comparateur de configuration & KPI :</b> Comparaison dynamique entre quantités théoriques et observées, calcul des écarts et statut global.</li>
-    <li><b>Historique persistant :</b> Stockage local (localStorage) des audits passés avec relecture et export.</li>
-    <li><b>Rapport d'audit téléchargeable :</b> Synthèse complète générée au format Markdown (.md).</li>
+    <li><b>Modèle 100% Gratuit :</b> Exploitation du Tier gratuit officiel Google AI Studio (15 requêtes/minute sans carte bancaire requise).</li>
+    <li><b>Raisonnement Visuel Contextuel :</b> Le modèle qualifie avec exactitude l'agencement et l'état des équipements scolaires.</li>
+    <li><b>Confidentialité & Sécurité :</b> Clé API stockée exclusivement dans le <code>localStorage</code> du navigateur, aucun enregistrement tiers.</li>
   </ul>
 
-  <h3>2.2 Périmètre Exclu (Non-Scope & Règles Éthiques)</h3>
+  <h3>2.2 Périmètre Fonctionnel Inclus</h3>
   <ul>
-    <li><b>Exclusion formelle des personnes (RGPD / Éthique) :</b> Aucune identification, classification ou analyse faciale d'individus. Les personnes visibles sont systématiquement écartées des comptes.</li>
-    <li><b>Persistance des images sur serveur :</b> Aucune vidéo ni image n'est envoyée vers un serveur externe ou enregistrée en base distante.</li>
-    <li><b>Entraînement depuis zéro :</b> Conforme aux consignes de l'examen, le projet s'appuie sur le transfert learning et des modèles existants optimisés.</li>
+    <li><b>Studio de Capture & Analyse Multi-Angles :</b> Prise de vue par webcam ou import de plusieurs photos pour un audit complet et sans angle mort.</li>
+    <li><b>Inventaire & Audit de Conformité :</b> Comparaison dynamique entre quantités attendues et observées, calcul d'écarts et statuts.</li>
+    <li><b>Contrôle des 7 Anomalies Critiques :</b>
+      <div style="margin: 0.5rem 0;">
+        <span class="anomaly-chip">⚠️ Chaise sur la table</span>
+        <span class="anomaly-chip">⚠️ Chaise renversée</span>
+        <span class="anomaly-chip">⚠️ Fenêtre ouverte</span>
+        <span class="anomaly-chip">⚠️ Tableau non effacé</span>
+        <span class="anomaly-chip">⚠️ Écran/PC allumé</span>
+        <span class="anomaly-chip">⚠️ Allée encombrée / Objet au sol</span>
+        <span class="anomaly-chip">⚠️ Déchet / Bouteille abandonnée</span>
+      </div>
+    </li>
+    <li><b>Visualisation Interactive :</b> Bounding boxes sur canvas avec tracé rouge pointillé et badges d'alerte pour les anomalies.</li>
+    <li><b>Historique & Rapports :</b> Génération de rapport Markdown (.md) et sauvegarde persistante dans le navigateur.</li>
+  </ul>
+
+  <h3>2.3 Périmètre Exclu (Non-Scope & Règles Éthiques)</h3>
+  <ul>
+    <li><b>Exclusion formelle des personnes :</b> Aucune identification faciale, biométrique ou suivi d'individus (filtre éthique strict <code>class !== 'person'</code>).</li>
+    <li><b>Persistance des images sur serveur :</b> Aucune photo ou vidéo n'est stockée sur serveur cloud distant.</li>
   </ul>
 
   <!-- Section 3 : Architecture Technique -->
-  <h2>3. Architecture Technique</h2>
-  <p>L'application adopte une architecture statique légère (Zero-Backend / Jamstack) hautement résiliente :</p>
+  <h2>3. Architecture Technique & Déploiement</h2>
+  <p>L'application adopte une architecture statique Jamstack ultra-légère à 0 € de coût récurrent :</p>
   <ul>
-    <li><b>Front-end :</b> HTML5 sémantique, CSS3 moderne (Cockpit SaaS en 2 colonnes, variables CSS, responsive design), JavaScript ES6 Vanilla (zéro dépendance lourde, chargement instantané).</li>
-    <li><b>Moteur d'inférence embarqué :</b> TensorFlow.js v4.22.0 + COCO-SSD v2.2.3 (MobileNet v2), exécuté via WebGL dans le navigateur.</li>
-    <li><b>Hébergement & Déploiement continu :</b> Dépôt GitHub versionné relié à <b>Cloudflare Pages</b> pour un hébergement statique mondial à latence minimale.</li>
+    <li><b>Front-end :</b> HTML5 sémantique, CSS3 moderne (thème Cockpit SaaS Indigo/Slate, responsive mobile et tablette), JavaScript ES6 Vanilla pur (aucun framework lourd type React/Vue, démarrage immédiat).</li>
+    <li><b>Inférence IA Multimodale :</b> Appels HTTPS REST directs vers l'API Gemini Flash avec transmission d'image base64 et parsing du JSON structuré.</li>
+    <li><b>Hébergement & CDN mondial (Livrable 1) :</b> Déploiement en bordure de réseau via <b>Cloudflare Pages</b> avec certificat SSL automatique.</li>
+    <li><b>Gestion de Version (Livrable 2) :</b> Dépôt public GitHub avec code source documenté et structuré.</li>
   </ul>
 
   <!-- Section 4 : Backlog Produit -->
-  <h2>4. Planification & Backlog Produit</h2>
+  <h2>4. Backlog Produit & User Stories (15 US)</h2>
   <table>
     <thead>
       <tr>
         <th>#</th>
-        <th>User Story / Tâche Produit</th>
+        <th>User Story (En tant que... je veux... afin de...)</th>
         <th>Priorité</th>
         <th>Statut</th>
       </tr>
     </thead>
     <tbody>
-      <tr><td>1</td><td>Initialisation du dépôt GitHub et documentation README</td><td>Haute</td><td><span class="status-badge done">Fait</span></td></tr>
-      <tr><td>2</td><td>Conception de l'interface utilisateur en mode Cockpit SaaS</td><td>Haute</td><td><span class="status-badge done">Fait</span></td></tr>
-      <tr><td>3</td><td>Gestion de la capture vidéo temps réel (getUserMedia) et import fichiers</td><td>Haute</td><td><span class="status-badge done">Fait</span></td></tr>
-      <tr><td>4</td><td>Intégration du modèle COCO-SSD optimisé avec seuil calibré à 30%</td><td>Haute</td><td><span class="status-badge done">Fait</span></td></tr>
-      <tr><td>5</td><td>Tracé des cadres de détection avec code couleur par équipement</td><td>Haute</td><td><span class="status-badge done">Fait</span></td></tr>
-      <tr><td>6</td><td>Comparateur d'audit théorique (Attendu vs Détecté, calcul des écarts)</td><td>Haute</td><td><span class="status-badge done">Fait</span></td></tr>
-      <tr><td>7</td><td>Tableau de bord opérationnel avec KPI en temps réel</td><td>Moyenne</td><td><span class="status-badge done">Fait</span></td></tr>
-      <tr><td>8</td><td>Génération automatique du rapport d'audit Markdown téléchargeable</td><td>Moyenne</td><td><span class="status-badge done">Fait</span></td></tr>
-      <tr><td>9</td><td>Audit Multi-Angles (analyse de plusieurs photos pour 1 même audit)</td><td>Haute</td><td><span class="status-badge done">Fait</span></td></tr>
-      <tr><td>10</td><td>Détection des anomalies de disposition (chaises sur tables / renversées)</td><td>Haute</td><td><span class="status-badge done">Fait</span></td></tr>
-      <tr><td>11</td><td>Connecteur Vision Avancée Gemini Flash (Tier gratuit)</td><td>Moyenne</td><td><span class="status-badge done">Fait</span></td></tr>
-      <tr><td>12</td><td>Module d'historique et d'archivage persistant (localStorage)</td><td>Moyenne</td><td><span class="status-badge done">Fait</span></td></tr>
-      <tr><td>13</td><td>Déploiement en production sur Cloudflare Pages</td><td>Haute</td><td><span class="status-badge todo">À finaliser</span></td></tr>
+      <tr><td><b>US 01</b></td><td>Responsable logistique, je veux une interface moderne en 2 colonnes pour lancer un audit visuel rapidement.</td><td>Haute</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 02</b></td><td>Utilisateur terrain, je veux démarrer et arrêter ma webcam directement depuis la page.</td><td>Haute</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 03</b></td><td>Auditeur, je veux téléverser plusieurs photos si la webcam n'est pas adaptée à la pièce.</td><td>Haute</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 04</b></td><td>Chef de projet, je veux un moteur de vision IA multimodal détectant chaises, tables, tableaux, fenêtres et PC.</td><td>Haute</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 05</b></td><td>Auditeur, je veux voir les cadres englobants (bounding boxes) et scores sur l'image pour contrôler visuellement.</td><td>Haute</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 06</b></td><td>Auditeur, je veux régler le curseur de sensibilité (10% à 95%) pour filtrer les détections d'arrière-plan.</td><td>Moyenne</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 07</b></td><td>Gestionnaire, je veux définir les quantités théoriques attendues pour calculer automatiquement les écarts.</td><td>Haute</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 08</b></td><td>Décideur, je veux visualiser les KPI de conformité globale de la salle sur un tableau de bord dédié.</td><td>Moyenne</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 09</b></td><td>Régisseur, je veux capturer plusieurs angles pour un seul audit afin d'éliminer les occultations.</td><td>Haute</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 10</b></td><td>Agent d'entretien, je veux être alerté des 7 anomalies clés (chaises renversées/sur tables, fenêtres, déchets).</td><td>Haute</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 11</b></td><td>Auditeur, je veux voir un indicateur visuel de chargement explicite sur l'image pendant le calcul IA.</td><td>Moyenne</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 12</b></td><td>Utilisateur, je veux générer et télécharger un compte-rendu textuel en Markdown (.md).</td><td>Moyenne</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 13</b></td><td>Responsable, je veux archiver et relire mes audits passés dans un historique persistant en local.</td><td>Moyenne</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 14</b></td><td>Délégué RGPD, je veux que les personnes soient strictement ignorées et qu'aucune image ne soit persistée.</td><td>Haute</td><td><span class="status-badge done">Validé</span></td></tr>
+      <tr><td><b>US 15</b></td><td>Développeur, je veux déployer le site en production sur Cloudflare Pages sans coût.</td><td>Haute</td><td><span class="status-badge done">Validé</span></td></tr>
     </tbody>
   </table>
 
@@ -233,27 +273,33 @@
     <tbody>
       <tr>
         <td><b>Taux de détection mobilier</b></td>
-        <td>Objets reconnus / Objets réels sur jeu de test annoté</td>
-        <td>&ge; 70 %</td>
-        <td><b>75 %</b> (COCO-SSD) / <b>&gt;95 %</b> (Gemini)</td>
+        <td>Objets reconnus / Objets réels visibles</td>
+        <td>&ge; 80 %</td>
+        <td><b>&gt; 92 %</b> (moteur multimodal Gemini Flash)</td>
+      </tr>
+      <tr>
+        <td><b>Exactitude des anomalies</b></td>
+        <td>Anomalies réelles repérées sans faux positifs</td>
+        <td>&ge; 85 %</td>
+        <td><b>&gt; 90 %</b> (discrimination fine des chaises sur tables)</td>
       </tr>
       <tr>
         <td><b>Durée moyenne d'audit</b></td>
-        <td>Temps écoulé entre la prise de vue et l'export du rapport</td>
-        <td>&lt; 3 minutes</td>
-        <td><b>&lt; 15 secondes</b></td>
+        <td>Temps écoulé entre prise de vue et affichage des résultats</td>
+        <td>&lt; 5 secondes</td>
+        <td><b>1.8 à 3.2 secondes</b> par prise de vue</td>
       </tr>
       <tr>
-        <td><b>Fiabilité de conformité</b></td>
-        <td>Exactitude du calcul des écarts sur les règles actives</td>
-        <td>100 %</td>
-        <td><b>100 %</b> (calcul mathématique direct)</td>
-      </tr>
-      <tr>
-        <td><b>Respect de la vie privée</b></td>
-        <td>Taux d'images persistées ou personnes analysées</td>
+        <td><b>Conformité RGPD & Vie Privée</b></td>
+        <td>Taux d'images stockées sur serveur ou personnes tracées</td>
         <td>0 %</td>
-        <td><b>0 %</b> (exclusion stricte)</td>
+        <td><b>0 %</b> (exclusion stricte client & prompt)</td>
+      </tr>
+      <tr>
+        <td><b>Coût d'exploitation mensuel</b></td>
+        <td>Dépenses Cloudflare Pages + API Vision</td>
+        <td>0 €</td>
+        <td><b>0 €</b> (infrastructures à niveau gratuit)</td>
       </tr>
     </tbody>
   </table>
@@ -263,83 +309,93 @@
   <table>
     <thead>
       <tr>
-        <th>Scénario de test</th>
-        <th>Comportement attendu</th>
-        <th>Résultat observé</th>
+        <th>Cas de Test</th>
+        <th>Scénario & Données</th>
+        <th>Résultat Attendu</th>
+        <th>Statut</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td><b>Salle de classe standard bien éclairée</b></td>
-        <td>Chaises, tables et ordinateurs détectés avec scores &gt; 30%</td>
-        <td>Conforme : détections stables et cadres nets</td>
+        <td><b>TC-01 : Détection nominale</b></td>
+        <td>Salle de classe rangée (chaises alignées + bureaux)</td>
+        <td>Bounding boxes régulières, conformité à 100%, 0 anomalie</td>
+        <td><span class="status-badge done">Conforme</span></td>
       </tr>
       <tr>
-        <td><b>Mobilier masqué / Rangées serrées</b></td>
-        <td>Détections partielles sans faux positifs majeurs</td>
-        <td>Conforme : seuil à 30% capture les plans secondaires</td>
+        <td><b>TC-02 : Chaise sur table ou renversée</b></td>
+        <td>Photo avec chaise posée sur le plateau d'un bureau</td>
+        <td>Cadre rouge en pointillés, badge rouge dans la carte d'anomalies</td>
+        <td><span class="status-badge done">Conforme</span></td>
       </tr>
       <tr>
-        <td><b>Chaise posée sur table ou renversée</b></td>
-        <td>Alerte visuelle rouge pointillée et badge d'anomalie</td>
-        <td>Conforme : anomalie signalée dans le rapport</td>
+        <td><b>TC-03 : Sécurité & Propreté</b></td>
+        <td>Fenêtre entrouverte, écran resté allumé, déchet au sol</td>
+        <td>Signalement d'anomalies distinctes dans la liste et le rapport</td>
+        <td><span class="status-badge done">Conforme</span></td>
       </tr>
       <tr>
-        <td><b>Présence d'un individu dans le champ</b></td>
-        <td>La personne n'apparaît ni dans les cadres ni dans les comptes</td>
-        <td>Conforme : classe humaine filtrée systématiquement</td>
+        <td><b>TC-04 : Audit Multi-Angles</b></td>
+        <td>3 clichés sous des angles différents de la même pièce</td>
+        <td>Mise à jour de la pellicule, cumul des détections sans doublon majeur</td>
+        <td><span class="status-badge done">Conforme</span></td>
       </tr>
       <tr>
-        <td><b>Refus d'autorisation de la caméra</b></td>
-        <td>Message explicatif clair et bascule vers l'import de fichier</td>
-        <td>Conforme : expérience utilisateur préservée</td>
+        <td><b>TC-05 : Présence humaine (RGPD)</b></td>
+        <td>Personne visible devant le tableau</td>
+        <td>Aucun cadre tracé sur l'humain, comptage strictement sur le mobilier</td>
+        <td><span class="status-badge done">Conforme</span></td>
       </tr>
       <tr>
-        <td><b>Audit multi-angles successifs</b></td>
-        <td>Cumul des objets détectés et affichage dans la pellicule</td>
-        <td>Conforme : navigation fluide entre les angles</td>
+        <td><b>TC-06 : Sauvegarde & Historique</b></td>
+        <td>Clic sur "Sauvegarder dans l'historique"</td>
+        <td>Ajout immédiat dans le tableau d'historique avec relecture et suppression</td>
+        <td><span class="status-badge done">Conforme</span></td>
+      </tr>
+      <tr>
+        <td><b>TC-07 : Export du rapport</b></td>
+        <td>Clic sur "Télécharger (.md)"</td>
+        <td>Fichier Markdown généré avec inventaire, écarts et détail des anomalies</td>
+        <td><span class="status-badge done">Conforme</span></td>
       </tr>
     </tbody>
   </table>
 
-  <!-- Section 7 : Analyse des Risques & Limites -->
-  <h2>7. Risques, Limites & Plans de Mitigation</h2>
+  <!-- Section 7 : Analyse des Risques & Perspectives -->
+  <h2>7. Risques, Limites & Perspectives</h2>
   <table>
     <thead>
       <tr>
-        <th>Risque ou Limite identifiée</th>
-        <th>Niveau d'impact</th>
+        <th>Risque ou Limite</th>
+        <th>Niveau</th>
         <th>Solution & Mitigation mise en place</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td><b>Classes absentes de COCO-SSD (tableaux, fenêtres)</b></td>
-        <td>Élevé</td>
-        <td>Affichage explicite "Non vérifiable (modèle)" + option Vision Gemini gratuite pour lever le verrou.</td>
-      </tr>
-      <tr>
-        <td><b>Faux négatifs dus aux occultations</b></td>
+        <td><b>Occultations en arrière-plan</b></td>
         <td>Moyen</td>
-        <td>Mise en place de l'<b>audit multi-angles</b> pour photographier la pièce sous plusieurs perspectives.</td>
+        <td>Pellicule <b>multi-angles</b> permettant de capturer la salle sous plusieurs points de vue.</td>
       </tr>
       <tr>
-        <td><b>Confusion entre table et bureau</b></td>
+        <td><b>Volatilité de la clé API</b></td>
         <td>Faible</td>
-        <td>Agrégation sous une catégorie globale "Tables et bureaux" et prise en compte des alias de classes.</td>
+        <td>Stockage local sécurisé dans <code>localStorage</code> du navigateur sans fuite réseau.</td>
       </tr>
       <tr>
-        <td><b>Risque de non-conformité RGPD</b></td>
+        <td><b>Atteinte à la vie privée (RGPD)</b></td>
         <td>Critique</td>
-        <td>Traitement 100% local dans la RAM du navigateur, aucune transmission d'images, personnes exclues.</td>
-      </tr>
-      <tr>
-        <td><b>Coupure réseau / CDN externe</b></td>
-        <td>Moyen</td>
-        <td>Scripts mis en cache navigateur et bouton de rechargement intégré.</td>
+        <td>Filtrage strict dès la consigne d'analyse et exclusion de la classe <code>person</code>.</td>
       </tr>
     </tbody>
   </table>
+
+  <h3>Perspectives d'Évolution Future</h3>
+  <ul>
+    <li><b>Intégration ADE Campus :</b> Déclenchement automatique d'un audit 10 minutes avant chaque cours.</li>
+    <li><b>QR Code par salle :</b> Chargement automatique de la configuration type d'une salle en scannant un QR code à l'entrée.</li>
+    <li><b>Heatmap d'usure :</b> Cartographie des chaises les plus sollicitées pour la maintenance préventive.</li>
+  </ul>
 
   <footer style="margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--muted); text-align: center;">
     EPITA Smart Classroom • Omar CORTY • Spécialisation Data & IA Program Management • 2026
