@@ -138,7 +138,92 @@ function stopCam() {
   $("snap").disabled = true;
 }
 
-/* ---------- Analyse avec API Gemini 1.5 Flash (Gratuit) ---------- */
+/* ---------- Analyse avec API Gemini Flash (Gratuit) ---------- */
+let cachedGeminiModel = null;
+
+async function callGeminiGenerate(apiKey, base64Data, prompt) {
+  const requestBody = {
+    contents: [
+      {
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: "image/jpeg", data: base64Data } }
+        ]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: "application/json"
+    }
+  };
+
+  const candidateModels = [];
+  if (cachedGeminiModel) {
+    candidateModels.push(cachedGeminiModel);
+  } else {
+    // Détection automatique des modèles disponibles pour cette clé
+    try {
+      const listRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+      );
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        const available = listData.models || [];
+        const flashModels = available
+          .filter(
+            (m) =>
+              m.supportedGenerationMethods?.includes("generateContent") &&
+              m.name?.includes("flash")
+          )
+          .map((m) => m.name.replace(/^models\//, ""));
+        candidateModels.push(...flashModels);
+      }
+    } catch (e) {
+      console.warn("Échec listModels, utilisation de la liste de secours :", e);
+    }
+  }
+
+  // Modèles par défaut en cas d'échec de listModels
+  const defaults = [
+    "gemini-2.0-flash",
+    "gemini-2.5-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-flash"
+  ];
+  for (const d of defaults) {
+    if (!candidateModels.includes(d)) candidateModels.push(d);
+  }
+
+  let lastErr = null;
+  for (const model of candidateModels) {
+    for (const ver of ["v1beta", "v1"]) {
+      const url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${apiKey}`;
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody)
+        });
+        if (res.ok) {
+          cachedGeminiModel = model;
+          return await res.json();
+        }
+        const errJson = await res.json().catch(() => ({}));
+        const errMsg = errJson.error?.message || `HTTP ${res.status}`;
+        lastErr = new Error(errMsg);
+        if (errMsg.toLowerCase().includes("api key") || errMsg.toLowerCase().includes("invalid")) {
+          throw lastErr;
+        }
+      } catch (err) {
+        if (err.message?.toLowerCase().includes("api key")) throw err;
+        lastErr = err;
+      }
+    }
+  }
+
+  throw lastErr || new Error("Aucun modèle Gemini compatible n'a pu être contacté.");
+}
+
 async function analyzeGemini(snapCanvas) {
   const apiKey = getGeminiKey();
   if (!apiKey) {
@@ -169,30 +254,7 @@ Format de réponse obligatoire : réponds STRICTEMENT avec un objet JSON sans au
 }
 Chaque valeur dans box_2d est un entier normalisé entre 0 et 1000 ([ymin, xmin, ymax, xmax]). Sois précis et exhaustif sur le mobilier.`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { text: prompt },
-          { inlineData: { mimeType: "image/jpeg", data: base64Data } }
-        ]
-      }],
-      generationConfig: {
-        temperature: 0.1,
-        responseMimeType: "application/json"
-      }
-    })
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error?.message || `Erreur API Gemini (${response.status})`);
-  }
-
-  const data = await response.json();
+  const data = await callGeminiGenerate(apiKey, base64Data, prompt);
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!rawText) throw new Error("Réponse vide reçue de l'IA.");
 
