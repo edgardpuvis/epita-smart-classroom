@@ -29,6 +29,7 @@ Application web d'audit visuel d'une salle de cours : détection du mobilier et 
 
 ---
 
+
 ## Lancement en local
 
 La caméra exige un contexte sécurisé (`localhost` ou `HTTPS`).
