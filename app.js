@@ -218,7 +218,6 @@ Analyse chaque objet et la salle pour repérer toute anomalie :
 - "Chaise renversée" : chaise couchée par terre, tombée ou renversée
 - "Fenêtre ouverte" : fenêtre entrouverte ou grande ouverte
 - "Tableau non effacé" : tableau avec des écritures, notes ou dessins non nettoyés
-- "Écran/PC allumé" : ordinateur portable ou moniteur resté allumé sans utilisateur
 - "Allée encombrée / Objet au sol" : sac à dos, câble ou matériel gênant la circulation
 - "Déchet / Récipient abandonné" : bouteille vide, gobelet ou déchet oublié sur table ou sol
 
@@ -235,7 +234,7 @@ Format de réponse obligatoire : réponds STRICTEMENT avec un objet JSON sans au
       "class": "chair" | "dining table" | "laptop" | "tv" | "whiteboard" | "window" | "backpack" | "bottle",
       "score": 0.95,
       "box_2d": [ymin, xmin, ymax, xmax],
-      "anomaly": null | "Chaise sur la table" | "Chaise renversée" | "Fenêtre ouverte" | "Tableau non effacé" | "Écran/PC allumé" | "Allée encombrée / Objet au sol" | "Déchet / Récipient abandonné"
+      "anomaly": null | "Chaise sur la table" | "Chaise renversée" | "Fenêtre ouverte" | "Tableau non effacé" | "Allée encombrée / Objet au sol" | "Déchet / Récipient abandonné"
     }
   ]
 }
@@ -716,8 +715,35 @@ function buildReport() {
   return L.join("\n");
 }
 
-/* ---------- Historique des Audits (LocalStorage) ---------- */
-function getHistory() {
+/* ---------- Historique des Audits (Cloudflare D1 + LocalStorage fallback) ---------- */
+const API_BASE = "/api/audits";
+
+function isCloudflareDeployed() {
+  return location.hostname !== "localhost" && location.hostname !== "127.0.0.1" && !location.protocol.startsWith("file");
+}
+
+async function getHistory() {
+  if (isCloudflareDeployed()) {
+    try {
+      const res = await fetch(API_BASE);
+      if (res.ok) {
+        const rows = await res.json();
+        return rows.map(r => ({
+          id: r.id,
+          date: r.date,
+          roomName: r.name,
+          viewsCount: r.views_count,
+          engine: r.engine,
+          totalDets: r.total_items,
+          globalStatus: r.status,
+          statusClass: r.status === "Conforme" ? "ok" : "warn",
+          report: r.report
+        }));
+      }
+    } catch (e) {
+      console.warn("D1 fetch échoué, fallback localStorage :", e);
+    }
+  }
   try {
     return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
   } catch {
@@ -725,31 +751,81 @@ function getHistory() {
   }
 }
 
-function saveHistoryItem(item) {
-  const history = getHistory();
-  history.unshift(item);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
-  renderHistory();
+async function saveHistoryItem(item) {
+  // Toujours sauvegarder en local
+  const local = await getLocalHistory();
+  local.unshift(item);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(local.slice(0, 50)));
+
+  // Sync vers D1 si déployé sur Cloudflare
+  if (isCloudflareDeployed()) {
+    try {
+      await fetch(API_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: item.id,
+          date: item.date,
+          name: item.roomName,
+          viewsCount: item.viewsCount,
+          engine: item.engine,
+          totalItems: item.totalDets,
+          status: item.globalStatus,
+          report: item.report
+        })
+      });
+    } catch (e) {
+      console.warn("Échec sync D1 :", e);
+    }
+  }
+  await renderHistory();
 }
 
-function deleteHistoryItem(id) {
+function getLocalHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+async function deleteHistoryItem(id) {
   if (!confirm("Voulez-vous supprimer cet audit de l'historique ?")) return;
-  const history = getHistory().filter((h) => h.id !== id);
+
+  // Supprimer du localStorage
+  const history = getLocalHistory().filter((h) => h.id !== id);
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-  renderHistory();
+
+  // Supprimer de D1 si déployé
+  if (isCloudflareDeployed()) {
+    try {
+      await fetch(`${API_BASE}/${id}`, { method: "DELETE" });
+    } catch (e) {
+      console.warn("Échec suppression D1 :", e);
+    }
+  }
+  await renderHistory();
 }
 
-function clearAllHistory() {
+async function clearAllHistory() {
   if (!confirm("Êtes-vous sûr de vouloir vider TOUT l'historique des audits ?")) return;
   localStorage.removeItem(HISTORY_KEY);
-  renderHistory();
+
+  if (isCloudflareDeployed()) {
+    try {
+      await fetch(API_BASE, { method: "DELETE" });
+    } catch (e) {
+      console.warn("Échec vidage D1 :", e);
+    }
+  }
+  await renderHistory();
   msg("Historique des audits vidé.");
 }
 
-function renderHistory() {
+async function renderHistory() {
   const container = $("history-rows");
   if (!container) return;
-  const history = getHistory();
+  const history = await getHistory();
   if (!history.length) {
     container.innerHTML = `<tr><td colspan="7" class="empty-history"><span>📂</span>Aucun audit enregistré dans l'historique pour le moment.</td></tr>`;
     return;
@@ -778,9 +854,10 @@ function renderHistory() {
     .join("");
 }
 
-function saveCurrentAudit() {
+async function saveCurrentAudit() {
   if (!auditViews.length) return msg("Aucun angle analysé à enregistrer.");
-  const defaultName = `Salle de cours #${getHistory().length + 1}`;
+  const localHistory = getLocalHistory();
+  const defaultName = `Salle de cours #${localHistory.length + 1}`;
   const roomName = prompt("Nom ou numéro de la salle pour cet audit :", defaultName);
   if (!roomName) return;
 
@@ -801,12 +878,14 @@ function saveCurrentAudit() {
     report: reportText,
   };
 
-  saveHistoryItem(item);
-  msg(`Audit « ${roomName} » sauvegardé avec succès dans l'historique !`);
+  await saveHistoryItem(item);
+  const syncLabel = isCloudflareDeployed() ? " et synchronisé dans la base de données ☁️" : "";
+  msg(`Audit « ${roomName} » sauvegardé avec succès${syncLabel} !`);
 }
 
-window.viewAuditReport = function (id) {
-  const item = getHistory().find((h) => h.id === id);
+window.viewAuditReport = async function (id) {
+  const history = await getHistory();
+  const item = history.find((h) => h.id === id);
   if (!item) return;
   $("report").textContent = item.report;
   $("dl").disabled = false;
@@ -814,8 +893,9 @@ window.viewAuditReport = function (id) {
   msg(`Rapport de l'audit « ${item.roomName} » affiché ci-dessous.`);
 };
 
-window.downloadAuditReport = function (id) {
-  const item = getHistory().find((h) => h.id === id);
+window.downloadAuditReport = async function (id) {
+  const history = await getHistory();
+  const item = history.find((h) => h.id === id);
   if (!item) return;
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([item.report], { type: "text/markdown" }));
