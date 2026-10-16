@@ -98,8 +98,8 @@
             <button id="stop" class="secondary" disabled>⏹ Arrêter</button>
             <button id="snap" disabled>⚡ Analyser l'image</button>
             <label class="file-btn secondary">
-              📁 Importer photo
-              <input id="file" type="file" accept="image/*" hidden />
+              📁 Importer photo(s)
+              <input id="file" type="file" accept="image/*" multiple hidden />
             </label>
           </div>
 
@@ -140,20 +140,34 @@
             </div>
             <input id="th" type="range" min="10" max="95" value="30" />
           </div>
+
+          <!-- Pellicule multi-angles de l'audit en cours -->
+          <div class="views-strip-container">
+            <div class="views-strip-header">
+              <div>
+                <span>Angles analysés pour cet audit :</span>
+                <b id="views-count" class="meta-info">0 angle</b>
+              </div>
+              <div class="views-strip-actions">
+                <button id="reset-audit" type="button" class="secondary btn-sm" title="Effacer les captures actuelles et démarrer un nouvel audit">↺ Nouvel Audit</button>
+              </div>
+            </div>
+            <div id="views-strip" class="views-strip"></div>
+          </div>
         </section>
 
         <!-- Détections par catégorie -->
         <section class="card">
           <div class="card-title">
-            <h2>📦 Détections par Catégorie</h2>
-            <span class="card-badge">Inventaire Brut</span>
+            <h2>📦 Détections Cumulées par Catégorie</h2>
+            <span class="card-badge">Inventaire Global</span>
           </div>
           <div class="audit-table-wrapper">
             <table>
               <thead>
                 <tr>
                   <th>Catégorie d'équipement</th>
-                  <th>Quantité détectée</th>
+                  <th>Quantité totale détectée</th>
                   <th>Confiance moyenne</th>
                 </tr>
               </thead>
@@ -173,7 +187,7 @@
         <section class="card">
           <div class="card-title">
             <h2>📊 Tableau de Bord Opérationnel</h2>
-            <span class="card-badge">KPI en Temps Réel</span>
+            <span class="card-badge">KPI Global Salle</span>
           </div>
           <div class="kpis-grid" id="kpis">
             <!-- Rempli dynamiquement par JS -->
@@ -183,11 +197,11 @@
         <!-- Audit de Conformité (Exigence académique Fonctionnalité C) -->
         <section class="card">
           <div class="card-title">
-            <h2>📋 Audit de Configuration</h2>
+            <h2>📋 Audit de Configuration Globale</h2>
             <span class="card-badge">Attendu vs Détecté</span>
           </div>
           <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.85rem;">
-            Ajustez les quantités attendues pour auditer la conformité de la salle de cours. Les écarts sont calculés automatiquement.
+            Ajustez les quantités attendues pour auditer la conformité de la salle sur l'ensemble des angles analysés.
           </p>
           <div class="audit-table-wrapper">
             <table>
@@ -216,6 +230,7 @@
           <div class="actions">
             <button id="gen">Générer le rapport</button>
             <button id="dl" class="secondary" disabled>Télécharger (.md)</button>
+            <button id="save-audit" class="secondary" disabled>💾 Sauvegarder dans l'historique</button>
           </div>
           <pre id="report" class="report-box">Lancez une analyse, puis générez le rapport officiel.</pre>
         </section>
@@ -223,6 +238,34 @@
       </div>
 
     </main>
+
+    <!-- Historique des Audits Enregistrés -->
+    <section class="history-section">
+      <div class="history-card">
+        <div class="history-header">
+          <h2>📁 Historique des Audits Enregistrés</h2>
+          <button id="clear-history" type="button" class="btn-sm btn-danger">🗑 Vider l'historique</button>
+        </div>
+        <div class="audit-table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Date & Heure</th>
+                <th>Audit</th>
+                <th>Vues analysées</th>
+                <th>Moteur IA</th>
+                <th>Total Équipements</th>
+                <th>Statut Global</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="history-rows">
+              <!-- Rempli dynamiquement par JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
     <!-- Footer épuré -->
     <footer>

@@ -55,7 +55,9 @@
 | 9 | Génération et téléchargement du rapport d'audit | Moyenne | Fait |
 | 10 | Optimisation du modèle local (seuil à 30%, alias bancs/bureaux/écrans) | Haute | Fait |
 | 11 | Connecteur Vision Avancée Gemini Flash (Tier gratuit) | Moyenne | Fait |
-| 12 | Déploiement continu sur Cloudflare Pages et tests de validation | Haute | À finaliser |
+| 12 | Audit Multi-Angles (analyse de plusieurs photos pour 1 même audit) | Haute | Fait |
+| 13 | Historique et archivage persistant des audits (LocalStorage) | Moyenne | Fait |
+| 14 | Déploiement continu sur Cloudflare Pages et tests de validation | Haute | À finaliser |
 
 ---
 
