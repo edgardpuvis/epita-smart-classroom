@@ -1,14 +1,19 @@
-// EPITA Smart Classroom : audit visuel d'une salle avec COCO-SSD (TensorFlow.js)
+// EPITA Smart Classroom : audit visuel d'une salle de cours
+// Double moteur : COCO-SSD optimisé (navigateur local) + Vision Avancée Gemini Flash (Google AI Studio - Gratuit)
 const $ = (id) => document.getElementById(id);
 
-// Libellés français des classes COCO-SSD. La classe "person" est volontairement absente :
-// les personnes sont écartées dès la détection et ne sont ni affichées ni comptées.
+// Libellés français des classes. La classe "person" est volontairement écartée pour respecter la vie privée.
 const LABELS = {
   chair: "Chaises",
   "dining table": "Tables et bureaux",
   laptop: "Ordinateurs portables",
   tv: "Écrans",
-  couch: "Canapés",
+  whiteboard: "Tableaux",
+  window: "Fenêtres",
+  couch: "Canapés / Fauteuils",
+  bench: "Bancs / Chaises",
+  desk: "Bureaux",
+  monitor: "Moniteurs / Écrans",
   keyboard: "Claviers",
   mouse: "Souris",
   "cell phone": "Téléphones",
@@ -22,16 +27,33 @@ const LABELS = {
 };
 const label = (c) => LABELS[c] || c;
 
-// Configuration théorique modifiable. cls = classe COCO-SSD, null = non prise en charge par le modèle.
+// Couleurs personnalisées par catégorie pour un affichage visuel clair et professionnel
+const COLORS = {
+  chair: "#2e7d52",        // Vert forêt
+  bench: "#2e7d52",
+  couch: "#2e7d52",
+  "dining table": "#2563eb", // Bleu roi
+  desk: "#2563eb",
+  laptop: "#7c3aed",       // Violet
+  tv: "#d97706",           // Orange
+  monitor: "#d97706",
+  whiteboard: "#0891b2",   // Cyan / Turquoise
+  window: "#ca8a04",       // Ambre
+  default: "#f2c94c",      // Jaune
+};
+
+// Configuration théorique modifiable.
+// isGeminiOnly = true : non supporté nativement par COCO-SSD (affiché "Non vérifiable"), mais audité par Gemini.
 const rules = [
-  { name: "Tables et bureaux", cls: "dining table", expected: 10 },
-  { name: "Chaises", cls: "chair", expected: 20 },
-  { name: "Ordinateurs portables", cls: "laptop", expected: 5 },
-  { name: "Écrans", cls: "tv", expected: 1 },
-  { name: "Tableau", cls: null, expected: 1 },
-  { name: "Fenêtres", cls: null, expected: 2 },
+  { name: "Tables et bureaux", cls: "dining table", aliases: ["dining table", "desk"], expected: 10 },
+  { name: "Chaises", cls: "chair", aliases: ["chair", "bench", "couch"], expected: 20 },
+  { name: "Ordinateurs portables", cls: "laptop", aliases: ["laptop"], expected: 5 },
+  { name: "Écrans", cls: "tv", aliases: ["tv", "monitor"], expected: 1 },
+  { name: "Tableau", cls: "whiteboard", aliases: ["whiteboard", "blackboard"], expected: 1, isGeminiOnly: true },
+  { name: "Fenêtres", cls: "window", aliases: ["window"], expected: 2, isGeminiOnly: true },
 ];
 
+let currentEngine = "coco"; // 'coco' ou 'gemini'
 let model = null,
   stream = null,
   snap = null,
@@ -39,7 +61,7 @@ let model = null,
   analysed = false,
   ms = 0;
 
-/* ---------- Modèle ---------- */
+/* ---------- Gestion du statut et modèle ---------- */
 function setModel(text, kind) {
   const b = $("model-status");
   b.textContent = text;
@@ -48,16 +70,32 @@ function setModel(text, kind) {
 
 async function loadModel() {
   $("retry").hidden = true;
-  setModel("Chargement du modèle...", "wait");
+  setModel("Chargement de COCO-SSD...", "wait");
   try {
-    //model = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
     model = await cocoSsd.load({ base: "mobilenet_v2" });
-    setModel("Modèle prêt (COCO-SSD)", "ok");
+    if (currentEngine === "coco") {
+      setModel("Modèle prêt (COCO-SSD optimisé)", "ok");
+    }
   } catch (e) {
     model = null;
-    setModel("Le modèle ne s'est pas chargé. Vérifiez votre connexion.", "err");
-    $("retry").hidden = false;
+    if (currentEngine === "coco") {
+      setModel("Le modèle local ne s'est pas chargé. Vérifiez votre connexion.", "err");
+      $("retry").hidden = false;
+    }
   }
+}
+
+/* ---------- Gestion Clé Gemini (LocalStorage) ---------- */
+function getGeminiKey() {
+  return localStorage.getItem("epita_gemini_key") || $("gemini-key").value.trim();
+}
+
+function saveGeminiKey() {
+  const key = $("gemini-key").value.trim();
+  if (!key) return msg("Veuillez saisir une clé API valide.");
+  localStorage.setItem("epita_gemini_key", key);
+  msg("Clé API Gemini enregistrée localement avec succès !");
+  setTimeout(() => msg(""), 3000);
 }
 
 /* ---------- Caméra ---------- */
@@ -100,23 +138,131 @@ function stopCam() {
   $("snap").disabled = true;
 }
 
-/* ---------- Analyse ---------- */
+/* ---------- Analyse avec API Gemini 1.5 Flash (Gratuit) ---------- */
+async function analyzeGemini(snapCanvas) {
+  const apiKey = getGeminiKey();
+  if (!apiKey) {
+    throw new Error("Clé API Gemini manquante. Veuillez saisir votre clé gratuite Google AI Studio ci-dessus.");
+  }
+
+  const base64Data = snapCanvas.toDataURL("image/jpeg", 0.85).split(",")[1];
+  const prompt = `Tu es un système de vision par ordinateur pour l'audit d'une salle de classe.
+Détecte TOUS les objets visibles appartenant aux catégories suivantes :
+- "chair" : chaises, sièges scolaires, bancs, tabourets
+- "dining table" : tables, bureaux, pupitres
+- "laptop" : ordinateurs portables
+- "tv" : écrans d'ordinateur, moniteurs, télévisions, vidéoprojecteurs
+- "whiteboard" : tableaux blancs, tableaux noirs, tableaux interactifs
+- "window" : fenêtres visibles
+
+RÈGLE ÉTHIQUE STRICTE : N'inclus JAMAIS les personnes ("person"). Ignore totalement toute personne présente.
+
+Format de réponse obligatoire : réponds STRICTEMENT avec un objet JSON sans aucun formatage Markdown (\`\`\`json exclu) :
+{
+  "objects": [
+    {
+      "class": "chair" | "dining table" | "laptop" | "tv" | "whiteboard" | "window",
+      "score": 0.95,
+      "box_2d": [ymin, xmin, ymax, xmax]
+    }
+  ]
+}
+Chaque valeur dans box_2d est un entier normalisé entre 0 et 1000 ([ymin, xmin, ymax, xmax]). Sois précis et exhaustif sur le mobilier.`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: "image/jpeg", data: base64Data } }
+        ]
+      }],
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: "application/json"
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `Erreur API Gemini (${response.status})`);
+  }
+
+  const data = await response.json();
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!rawText) throw new Error("Réponse vide reçue de l'IA.");
+
+  const firstBrace = rawText.indexOf("{");
+  const lastBrace = rawText.lastIndexOf("}");
+  if (firstBrace === -1 || lastBrace === -1) throw new Error("Format JSON introuvable dans la réponse de l'IA.");
+  const cleanJson = rawText.slice(firstBrace, lastBrace + 1);
+  const parsed = JSON.parse(cleanJson);
+  const objects = parsed.objects || [];
+
+  return objects
+    .filter((obj) => obj.class && obj.class !== "person")
+    .map((obj) => {
+      let bbox = [0, 0, 0, 0];
+      if (Array.isArray(obj.box_2d) && obj.box_2d.length === 4) {
+        const [ymin, xmin, ymax, xmax] = obj.box_2d;
+        const x = Math.round((xmin / 1000) * snapCanvas.width);
+        const y = Math.round((ymin / 1000) * snapCanvas.height);
+        const w = Math.round(((xmax - xmin) / 1000) * snapCanvas.width);
+        const h = Math.round(((ymax - ymin) / 1000) * snapCanvas.height);
+        bbox = [x, y, w, h];
+      }
+      return {
+        class: obj.class,
+        score: typeof obj.score === "number" ? obj.score : 0.95,
+        bbox
+      };
+    });
+}
+
+/* ---------- Pipeline d'Analyse Principal ---------- */
 async function analyze(src, w, h) {
-  if (!model) return msg("Le modèle n'est pas chargé : analyse impossible.");
   msg("");
   const scale = Math.min(1, 1280 / w);
-  snap = document.createElement("canvas"); // copie en mémoire uniquement, jamais enregistrée
+  snap = document.createElement("canvas");
   snap.width = Math.round(w * scale);
   snap.height = Math.round(h * scale);
   snap.getContext("2d").drawImage(src, 0, 0, snap.width, snap.height);
+
+  if (currentEngine === "gemini") {
+    setModel("Analyse en cours avec Gemini Flash...", "wait");
+    try {
+      const t = performance.now();
+      const preds = await analyzeGemini(snap);
+      ms = Math.round(performance.now() - t);
+      raw = preds.filter((p) => p.class !== "person");
+      analysed = true;
+      setModel("Analyse Gemini terminée avec succès", "ok");
+      render();
+    } catch (e) {
+      setModel("Erreur Gemini", "err");
+      msg("Erreur API Gemini : " + e.message);
+    }
+    return;
+  }
+
+  // Moteur COCO-SSD Local
+  if (!model) return msg("Le modèle local n'est pas prêt : veuillez patienter ou recharger.");
+  setModel("Analyse locale en cours...", "wait");
   try {
     const t = performance.now();
+    // Seuil de détection bas (0.05) pour capter tous les candidats, le slider filtre ensuite
     const preds = await model.detect(snap, 100, 0.05);
     ms = Math.round(performance.now() - t);
-    raw = preds.filter((p) => p.class !== "person"); // aucune analyse des personnes
+    raw = preds.filter((p) => p.class !== "person");
     analysed = true;
+    setModel("Modèle prêt (COCO-SSD optimisé)", "ok");
     render();
   } catch (e) {
+    setModel("Erreur d'analyse", "err");
     msg("Erreur pendant l'analyse : " + e.message);
   }
 }
@@ -132,12 +278,22 @@ function counts(dets) {
   return c;
 }
 
+function getRuleCount(r, c) {
+  let total = 0;
+  const aliases = r.aliases || [r.cls];
+  aliases.forEach((a) => {
+    if (c[a]) total += c[a].length;
+  });
+  return total;
+}
+
 function status(r, n) {
-  if (!r.cls)
+  const isVerifiable = currentEngine === "gemini" ? Boolean(r.cls) : Boolean(!r.isGeminiOnly && r.cls);
+  if (!isVerifiable)
     return { gap: "-", t: "Non vérifiable (modèle)", c: "na", ecart: false };
   if (!analysed) return { gap: "-", t: "En attente", c: "na", ecart: false };
   const gap = n - r.expected;
-  if (gap === 0) return { gap, t: "Conforme", c: "ok", ecart: false };
+  if (gap === 0) return { gap: 0, t: "Conforme", c: "ok", ecart: false };
   if (n === 0)
     return {
       gap,
@@ -153,7 +309,7 @@ function status(r, n) {
   };
 }
 
-/* ---------- Rendu ---------- */
+/* ---------- Rendu Visuel (Canvas et Tableaux) ---------- */
 function draw() {
   const cv = $("out"),
     ctx = cv.getContext("2d");
@@ -161,21 +317,25 @@ function draw() {
   cv.width = snap.width;
   cv.height = snap.height;
   ctx.drawImage(snap, 0, 0);
-  const lw = Math.max(2, cv.width / 300),
-    fs = Math.max(12, cv.width / 50);
+
+  const lw = Math.max(2, Math.round(cv.width / 320)),
+    fs = Math.max(12, Math.round(cv.width / 50));
   ctx.lineWidth = lw;
-  ctx.font = `bold ${fs}px system-ui`;
+  ctx.font = `bold ${fs}px system-ui, -apple-system, sans-serif`;
   ctx.textBaseline = "top";
+
   current().forEach((d) => {
     const [x, y, w, h] = d.bbox,
+      color = COLORS[d.class] || COLORS.default,
       t = `${label(d.class)} ${Math.round(d.score * 100)}%`;
-    ctx.strokeStyle = "#f2c94c";
+    ctx.strokeStyle = color;
     ctx.strokeRect(x, y, w, h);
-    const tw = ctx.measureText(t).width + 8;
-    ctx.fillStyle = "#f2c94c";
-    ctx.fillRect(x, y, tw, fs + 6);
-    ctx.fillStyle = "#17231f";
-    ctx.fillText(t, x + 4, y + 3);
+    const tw = ctx.measureText(t).width + 10;
+    const labelY = Math.max(0, y - fs - 6);
+    ctx.fillStyle = color;
+    ctx.fillRect(x, labelY, tw, fs + 6);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(t, x + 5, labelY + 3);
   });
 }
 
@@ -195,12 +355,13 @@ function render() {
         .join("")
     : `<tr><td colspan="3">${analysed ? "Aucune détection à ce seuil." : "Aucune analyse pour le moment."}</td></tr>`;
 
-  // Audit
+  // Audit de la configuration
   let ecarts = 0;
   rules.forEach((r, i) => {
-    const n = r.cls && c[r.cls] ? c[r.cls].length : 0,
-      s = status(r, n);
-    r.result = { n: r.cls ? n : "-", ...s };
+    const isVerifiable = currentEngine === "gemini" ? Boolean(r.cls) : Boolean(!r.isGeminiOnly && r.cls);
+    const n = isVerifiable ? getRuleCount(r, c) : 0;
+    const s = status(r, n);
+    r.result = { n: isVerifiable ? n : "-", ...s };
     if (s.ecart) ecarts++;
     $("det" + i).textContent = r.result.n;
     $("gap" + i).textContent = s.gap;
@@ -208,14 +369,18 @@ function render() {
     $("st" + i).className = "st " + s.c;
   });
 
-  // Tableau de bord, calculé à partir des résultats réels
-  const verifiables = rules.filter((r) => r.cls).length;
+  // Tableau de bord KPI
+  const verifiables = rules.filter((r) =>
+    currentEngine === "gemini" ? Boolean(r.cls) : Boolean(!r.isGeminiOnly && r.cls)
+  ).length;
+
   let global = ["En attente d'analyse", "na"];
   if (analysed)
     global =
       ecarts === 0
         ? ["Conforme sur les catégories vérifiables", "ok"]
         : ["Écarts à contrôler", "warn"];
+
   const k = (v, l, cls = "") => `<div class="kpi ${cls}"><b>${v}</b>${l}</div>`;
   $("kpis").innerHTML =
     k(dets.length, "objets détectés") +
@@ -224,21 +389,29 @@ function render() {
     k(ecarts, "écarts observés", ecarts ? "warn" : "") +
     k(global[0], "statut global", global[1]) +
     k(analysed ? ms + " ms" : "-", "durée de l'analyse");
+
   window.__audit = { dets, c, ecarts, verifiables, global: global[0] };
 }
 
-/* ---------- Rapport (généré par règles, sans IA générative) ---------- */
+/* ---------- Génération du Rapport d'Audit ---------- */
 function buildReport() {
   if (!analysed)
     return "Aucune analyse disponible. Capturez ou importez une image d'abord.";
+
   const { dets, c, ecarts, verifiables, global } = window.__audit;
+  const engineDesc = currentEngine === "gemini"
+    ? "Vision IA Avancée Gemini 1.5 Flash (Google AI Studio - Gratuit)"
+    : "COCO-SSD optimisé (TensorFlow.js / MobileNet v2)";
+
   const L = [
     "# Rapport d'audit : EPITA Smart Classroom",
     "",
     `Date : ${new Date().toLocaleString("fr-FR")}`,
+    `Moteur d'IA : ${engineDesc}`,
+    `Seuil de confiance : ${Math.round(threshold() * 100)} %`,
     "",
     "## Contexte",
-    `Audit visuel d'une salle de cours avec le modèle COCO-SSD (TensorFlow.js), exécuté dans le navigateur. Seuil de confiance : ${Math.round(threshold() * 100)} %. Aucune image n'est enregistrée et les personnes ne sont pas analysées.`,
+    `Audit visuel d'une salle de cours. Aucune image n'est enregistrée et les personnes ne sont pas analysées (respect strict de la vie privée).`,
     "",
     "## Objets détectés",
     `Total : ${dets.length} objet(s) dans ${Object.keys(c).length} catégorie(s).`,
@@ -249,6 +422,7 @@ function buildReport() {
     ),
   );
   if (!dets.length) L.push("- Aucun objet détecté à ce seuil.");
+
   L.push(
     "",
     "## Quantités attendues et observées",
@@ -260,6 +434,7 @@ function buildReport() {
       `| ${r.name} | ${r.expected} | ${r.result.n} | ${r.result.gap} | ${r.result.t} |`,
     ),
   );
+
   L.push(
     "",
     "## Écarts identifiés",
@@ -270,22 +445,29 @@ function buildReport() {
     .forEach((r) =>
       L.push(`- ${r.name} : attendu ${r.expected}, détecté ${r.result.n}.`),
     );
-  const nonSup = rules.filter((r) => !r.cls).map((r) => r.name);
+
+  const nonSup = rules
+    .filter((r) => currentEngine === "coco" ? (r.isGeminiOnly || !r.cls) : !r.cls)
+    .map((r) => r.name);
+
   L.push(
     "",
     "## Catégories non prises en charge",
     nonSup.length
-      ? `${nonSup.join(", ")} : le modèle ne reconnaît pas ces catégories. Aucune détection n'est inventée, un contrôle manuel est nécessaire.`
-      : "Aucune.",
+      ? `${nonSup.join(", ")} : le modèle COCO-SSD ne reconnaît pas nativement ces catégories. Aucune détection n'est inventée, un contrôle manuel est nécessaire.`
+      : "Toutes les catégories de l'audit sont prises en charge par le modèle actif.",
   );
+
   L.push(
     "",
     "## Limites de l'analyse",
-    "- Un objet non détecté n'est pas forcément absent (masqué, mal cadré, trop petit, mal éclairé).",
-    "- COCO-SSD ne distingue pas une table à manger d'un bureau.",
-    "- Une seule image est analysée : elle ne couvre pas toute la salle.",
-    "- Un score de confiance élevé n'est pas une garantie d'exactitude.",
+    "- Un objet non détecté n'est pas forcément absent (masqué, mal cadré, trop petit ou mal éclairé).",
+    currentEngine === "coco"
+      ? "- COCO-SSD est un modèle léger qui peut agréger les chaises proches ou ignorer les objets lointains."
+      : "- L'analyse dépend de la visibilité sur l'image et de l'absence de reflets sur les fenêtres/écrans.",
+    "- Une seule image est analysée : elle ne couvre pas l'intégralité de la pièce.",
   );
+
   L.push("", "## Recommandations pour un contrôle complémentaire");
   if (
     rules.some(
@@ -296,14 +478,15 @@ function buildReport() {
     )
   )
     L.push(
-      "- Refaire l'analyse avec plusieurs cadrages de la salle et une meilleure luminosité.",
+      "- Réaliser une prise de vue complémentaire sous un autre angle ou avec un meilleur éclairage.",
     );
   if (rules.some((r) => r.result.ecart && String(r.result.gap).startsWith("+")))
     L.push(
-      "- Vérifier les possibles doublons de détection ou ajuster le seuil de confiance.",
+      "- Ajuster le seuil de confiance si des faux positifs ou doublons apparaissent.",
     );
   if (nonSup.length) L.push(`- Contrôler visuellement : ${nonSup.join(", ")}.`);
-  L.push("- Confirmer les écarts par un comptage manuel avant toute décision.");
+  L.push("- Confirmer les écarts par un comptage physique avant toute commande ou intervention.");
+
   return L.join("\n");
 }
 
@@ -316,12 +499,35 @@ function init() {
     <td id="det${i}">-</td><td id="gap${i}">-</td><td id="st${i}" class="st na">-</td></tr>`,
     )
     .join("");
+
   $("rules").addEventListener("input", (e) => {
     const i = e.target.dataset.i;
     if (i === undefined) return;
     rules[i].expected = Math.max(0, parseInt(e.target.value, 10) || 0);
     render();
   });
+
+  // Gestion du choix de moteur IA
+  document.querySelectorAll('input[name="engine"]').forEach((radio) => {
+    radio.addEventListener("change", (e) => {
+      currentEngine = e.target.value;
+      const isGemini = currentEngine === "gemini";
+      $("gemini-config").hidden = !isGemini;
+      if (isGemini) {
+        setModel("Mode Vision Gemini Flash actif (Prêt)", "ok");
+      } else {
+        setModel(model ? "Modèle prêt (COCO-SSD optimisé)" : "Chargement de COCO-SSD...", model ? "ok" : "wait");
+      }
+      render();
+    });
+  });
+
+  // Sauvegarde clé API Gemini
+  const savedKey = localStorage.getItem("epita_gemini_key");
+  if (savedKey) $("gemini-key").value = savedKey;
+  $("save-key").onclick = saveGeminiKey;
+
+  // Événements caméra & fichiers
   $("start").onclick = startCam;
   $("stop").onclick = stopCam;
   $("snap").onclick = () => {
@@ -330,6 +536,7 @@ function init() {
   };
   $("th").oninput = render;
   $("retry").onclick = loadModel;
+
   $("file").onchange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
@@ -343,10 +550,12 @@ function init() {
     img.src = url;
     e.target.value = "";
   };
+
   $("gen").onclick = () => {
     $("report").textContent = buildReport();
     $("dl").disabled = !analysed;
   };
+
   $("dl").onclick = () => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(
@@ -356,7 +565,9 @@ function init() {
     a.click();
     URL.revokeObjectURL(a.href);
   };
+
   render();
   loadModel();
 }
+
 window.addEventListener("DOMContentLoaded", init);

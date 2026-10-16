@@ -34,4 +34,13 @@ td input{width:5rem;font:inherit;padding:.25rem}
 .hint{color:var(--na);margin-top:0}
 .report{white-space:pre-wrap;background:#f6f8f7;border:1px solid var(--line);padding:1rem;border-radius:4px;font:14px/1.5 ui-monospace,Consolas,monospace;margin-top:.8rem}
 footer{text-align:center;color:var(--na);padding:1rem}
+.engine-box{background:#f6f8f7;border:1px solid var(--line);border-radius:6px;padding:.75rem 1rem;margin-bottom:1rem}
+.engine-label{font-weight:600;display:block;margin-bottom:.4rem}
+.engine-options{display:flex;flex-wrap:wrap;gap:1.25rem}
+.engine-options label{cursor:pointer;display:flex;align-items:center;gap:.4rem}
+.gemini-config{background:#fffbe6;border:1px solid var(--yellow);border-radius:6px;padding:.75rem 1rem;margin-bottom:1rem}
+.gemini-row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.gemini-row input{flex:1;min-width:240px;padding:.45rem .6rem;border:1px solid var(--line);border-radius:4px;font:inherit}
+.link-hint{color:var(--board);font-weight:600;text-decoration:underline;font-size:.9rem}
+.hint-small{font-size:.8rem;color:var(--na);margin:.4rem 0 0}
 @media (prefers-reduced-motion:no-preference){button{transition:background .15s}}

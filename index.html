@@ -1,72 +1,169 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EPITA Smart Classroom</title>
-<link rel="stylesheet" href="style.css">
-<!-- Provenance : TensorFlow.js et COCO-SSD (tensorflow/tfjs-models), servis par jsDelivr -->
-<script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-<script defer src="app.js"></script>
-</head>
-<body>
-<header class="hero">
-  <nav><a href="#audit">Audit</a><a href="#dashboard">Tableau de bord</a><a href="#rapport">Rapport</a></nav>
-  <h1>EPITA Smart Classroom</h1>
-  <p>Vérifiez en quelques clics que la salle de cours contient le mobilier et le matériel prévus. L'analyse se fait dans votre navigateur : aucune image n'est envoyée ni enregistrée.</p>
-  <p class="privacy">Cadrez uniquement le mobilier et les équipements. Les personnes ne sont ni analysées ni comptées.</p>
-  <span id="model-status" class="badge wait">Chargement du modèle...</span>
-  <button id="retry" class="ghost" hidden>Réessayer le chargement</button>
-</header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EPITA Smart Classroom</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- Provenance : TensorFlow.js et COCO-SSD (tensorflow/tfjs-models), servis par jsDelivr -->
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"
+    ></script>
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <header class="hero">
+      <nav>
+        <a href="#audit">Audit</a><a href="#dashboard">Tableau de bord</a
+        ><a href="#rapport">Rapport</a>
+      </nav>
+      <h1>EPITA Smart Classroom</h1>
+      <p>
+        Vérifiez en quelques clics que la salle de cours contient le mobilier et
+        le matériel prévus. L'analyse (test) se fait dans votre navigateur :
+        aucune image n'est envoyée ni enregistrée.
+      </p>
+      <p class="privacy">
+        Cadrez uniquement le mobilier et les équipements. Les personnes ne sont
+        ni analysées ni comptées.
+      </p>
+      <span id="model-status" class="badge wait">Chargement du modèle...</span>
+      <button id="retry" class="ghost" hidden>Réessayer le chargement</button>
+    </header>
 
-<main>
-  <section id="audit" class="panel">
-    <h2>1. Capturer la salle</h2>
-    <div class="actions">
-      <button id="start">Démarrer la caméra</button>
-      <button id="stop" class="ghost" disabled>Arrêter la caméra</button>
-      <button id="snap" disabled>Analyser l'image de la caméra</button>
-      <label class="file ghost">Importer une image de test<input id="file" type="file" accept="image/*" hidden></label>
-    </div>
-    <p id="msg" class="msg" role="status"></p>
-    <div class="views">
-      <figure><figcaption>Caméra</figcaption><video id="video" playsinline muted></video></figure>
-      <figure><figcaption>Résultat de l'analyse</figcaption><canvas id="out" width="640" height="360"></canvas></figure>
-    </div>
-    <label class="slider">Seuil de confiance : <b id="th-val">50 %</b>
-      <input id="th" type="range" min="10" max="95" value="50">
-    </label>
-  </section>
+    <main>
+      <section id="audit" class="panel">
+        <h2>1. Capturer la salle</h2>
 
-  <section id="dashboard" class="panel">
-    <h2>2. Tableau de bord</h2>
-    <div class="kpis" id="kpis"></div>
-  </section>
+        <div class="engine-box">
+          <span class="engine-label">Moteur d'IA :</span>
+          <div class="engine-options">
+            <label
+              ><input type="radio" name="engine" value="coco" checked />
+              <b>COCO-SSD optimisé</b> (Navigateur, 100% privé, sans clé)</label
+            >
+            <label
+              ><input type="radio" name="engine" value="gemini" />
+              <b>Vision Avancée Gemini Flash</b> (Gratuit, inclut tableaux &
+              fenêtres)</label
+            >
+          </div>
+        </div>
 
-  <section class="panel">
-    <h2>3. Audit : configuration attendue et résultats</h2>
-    <p class="hint">Modifiez les quantités attendues. Un objet non détecté n'est pas forcément absent : il peut être masqué, mal cadré ou inconnu du modèle.</p>
-    <div class="scroll"><table>
-      <thead><tr><th>Catégorie</th><th>Attendu</th><th>Détecté</th><th>Écart</th><th>Statut</th></tr></thead>
-      <tbody id="rules"></tbody>
-    </table></div>
-    <h3>Objets détectés</h3>
-    <div class="scroll"><table>
-      <thead><tr><th>Catégorie</th><th>Nombre</th><th>Confiance moyenne</th></tr></thead>
-      <tbody id="found"></tbody>
-    </table></div>
-  </section>
+        <div id="gemini-config" class="gemini-config" hidden>
+          <div class="gemini-row">
+            <input
+              type="password"
+              id="gemini-key"
+              placeholder="Clé Google AI Studio gratuite (AIzaSy...)"
+              autocomplete="off"
+            />
+            <button id="save-key" type="button" class="ghost">
+              Enregistrer la clé
+            </button>
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener"
+              class="link-hint"
+              >Obtenir une clé gratuite &rarr;</a
+            >
+          </div>
+          <p class="hint-small">
+            Tier gratuit Google AI Studio (sans CB requise). La clé reste
+            strictement stockée dans le navigateur.
+          </p>
+        </div>
 
-  <section id="rapport" class="panel">
-    <h2>4. Rapport d'audit</h2>
-    <div class="actions">
-      <button id="gen">Générer le rapport</button>
-      <button id="dl" class="ghost" disabled>Télécharger (.md)</button>
-    </div>
-    <pre id="report" class="report">Lancez une analyse, puis générez le rapport.</pre>
-  </section>
-</main>
-<footer>Projet pédagogique EPITA, IA for Managers. Modèle : COCO-SSD (TensorFlow.js).</footer>
-</body>
+        <div class="actions">
+          <button id="start">Démarrer la caméra</button>
+          <button id="stop" class="ghost" disabled>Arrêter la caméra</button>
+          <button id="snap" disabled>Analyser l'image de la caméra</button>
+          <label class="file ghost"
+            >Importer une image de test<input
+              id="file"
+              type="file"
+              accept="image/*"
+              hidden
+          /></label>
+        </div>
+        <p id="msg" class="msg" role="status"></p>
+        <div class="views">
+          <figure>
+            <figcaption>Caméra</figcaption>
+            <video id="video" playsinline muted></video>
+          </figure>
+          <figure>
+            <figcaption>Résultat de l'analyse</figcaption>
+            <canvas id="out" width="640" height="360"></canvas>
+          </figure>
+        </div>
+        <label class="slider"
+          >Seuil de confiance : <b id="th-val">30 %</b>
+          <input id="th" type="range" min="10" max="95" value="30" />
+        </label>
+      </section>
+
+      <section id="dashboard" class="panel">
+        <h2>2. Tableau de bord</h2>
+        <div class="kpis" id="kpis"></div>
+      </section>
+
+      <section class="panel">
+        <h2>3. Audit : configuration attendue et résultats</h2>
+        <p class="hint">
+          Modifiez les quantités attendues. Un objet non détecté n'est pas
+          forcément absent : il peut être masqué, mal cadré ou inconnu du
+          modèle.
+        </p>
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Catégorie</th>
+                <th>Attendu</th>
+                <th>Détecté</th>
+                <th>Écart</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody id="rules"></tbody>
+          </table>
+        </div>
+        <h3>Objets détectés</h3>
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Catégorie</th>
+                <th>Nombre</th>
+                <th>Confiance moyenne</th>
+              </tr>
+            </thead>
+            <tbody id="found"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="rapport" class="panel">
+        <h2>4. Rapport d'audit</h2>
+        <div class="actions">
+          <button id="gen">Générer le rapport</button>
+          <button id="dl" class="ghost" disabled>Télécharger (.md)</button>
+        </div>
+        <pre id="report" class="report">
+Lancez une analyse, puis générez le rapport.</pre
+        >
+      </section>
+    </main>
+    <footer>
+      Projet pédagogique EPITA, IA for Managers. Modèle : COCO-SSD
+      (TensorFlow.js).
+    </footer>
+  </body>
 </html>
