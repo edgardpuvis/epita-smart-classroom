@@ -294,9 +294,29 @@ async function analyze(src, w, h) {
   snap.height = Math.round(h * scale);
   snap.getContext("2d").drawImage(src, 0, 0, snap.width, snap.height);
 
-  if (currentEngine === "gemini") {
-    setModel("Analyse en cours avec Gemini Flash...", "wait");
-    try {
+  // 1. Afficher immédiatement la photo prise dans la boîte de détection
+  const cv = $("out"),
+    ctx = cv.getContext("2d");
+  cv.width = snap.width;
+  cv.height = snap.height;
+  ctx.drawImage(snap, 0, 0);
+
+  // 2. Afficher le panneau "Analyse en cours" sur la photo
+  const overlay = $("analysis-overlay");
+  const overlayTitle = overlay ? overlay.querySelector("b") : null;
+  if (overlayTitle) {
+    overlayTitle.textContent = currentEngine === "gemini" 
+      ? "Analyse Gemini Vision en cours..." 
+      : "Analyse COCO-SSD en cours...";
+  }
+  if (overlay) overlay.hidden = false;
+
+  // Laisser le navigateur afficher l'image et l'overlay avant l'inférence
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  try {
+    if (currentEngine === "gemini") {
+      setModel("Analyse en cours avec Gemini Flash...", "wait");
       const t = performance.now();
       const preds = await analyzeGemini(snap);
       ms = Math.round(performance.now() - t);
@@ -304,28 +324,25 @@ async function analyze(src, w, h) {
       analysed = true;
       setModel("Analyse Gemini terminée avec succès", "ok");
       render();
-    } catch (e) {
-      setModel("Erreur Gemini", "err");
-      msg("Erreur API Gemini : " + e.message);
+    } else {
+      if (!model) {
+        throw new Error("Le modèle local n'est pas prêt : veuillez patienter ou recharger.");
+      }
+      setModel("Analyse locale en cours...", "wait");
+      const t = performance.now();
+      const preds = await model.detect(snap, 100, 0.05);
+      ms = Math.round(performance.now() - t);
+      raw = preds.filter((p) => p.class !== "person");
+      analysed = true;
+      setModel("Modèle prêt (COCO-SSD optimisé)", "ok");
+      render();
     }
-    return;
-  }
-
-  // Moteur COCO-SSD Local
-  if (!model) return msg("Le modèle local n'est pas prêt : veuillez patienter ou recharger.");
-  setModel("Analyse locale en cours...", "wait");
-  try {
-    const t = performance.now();
-    // Seuil de détection bas (0.05) pour capter tous les candidats, le slider filtre ensuite
-    const preds = await model.detect(snap, 100, 0.05);
-    ms = Math.round(performance.now() - t);
-    raw = preds.filter((p) => p.class !== "person");
-    analysed = true;
-    setModel("Modèle prêt (COCO-SSD optimisé)", "ok");
-    render();
   } catch (e) {
     setModel("Erreur d'analyse", "err");
-    msg("Erreur pendant l'analyse : " + e.message);
+    msg("Erreur : " + e.message);
+  } finally {
+    // 3. Masquer le panneau d'analyse dès que le traitement est terminé
+    if (overlay) overlay.hidden = true;
   }
 }
 

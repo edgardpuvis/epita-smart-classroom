@@ -119,7 +119,16 @@
                 <span>Détections & Bounding Boxes</span>
                 <span id="scale-info">Traitement IA</span>
               </div>
-              <canvas id="out" width="640" height="360"></canvas>
+              <div class="canvas-wrapper">
+                <canvas id="out" width="640" height="360"></canvas>
+                <div id="analysis-overlay" class="analysis-overlay" hidden>
+                  <div class="spinner"></div>
+                  <div class="overlay-text">
+                    <b>Analyse IA en cours...</b>
+                    <span>Détection du mobilier et des équipements</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
