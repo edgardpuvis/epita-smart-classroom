@@ -2,7 +2,7 @@
 
 Application web d'audit visuel d'une salle de cours : détection du mobilier et des équipements, comparaison avec une configuration attendue, tableau de bord en temps réel et rapport d'audit téléchargeable.
 
-**URL publique :** `À COMPLÉTER (URL Cloudflare Pages)`
+**URL publique :** `https://epita-smart-classroom-87u.pages.dev/`
 
 ---
 
