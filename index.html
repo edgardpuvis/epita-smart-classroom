@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>EPITA Smart Classroom</title>
+    <title>EPITA Smart Classroom - Audit Visuel par IA</title>
     <link rel="stylesheet" href="style.css" />
-    <!-- Provenance : TensorFlow.js et COCO-SSD (tensorflow/tfjs-models), servis par jsDelivr -->
+    <!-- Scripts TensorFlow.js & COCO-SSD (jsDelivr) -->
     <script
       defer
       src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"
@@ -17,153 +17,207 @@
     <script defer src="app.js"></script>
   </head>
   <body>
-    <header class="hero">
-      <nav>
-        <a href="#audit">Audit</a><a href="#dashboard">Tableau de bord</a
-        ><a href="#rapport">Rapport</a>
-      </nav>
-      <h1>EPITA Smart Classroom</h1>
-      <p>
-        Vérifiez en quelques clics que la salle de cours contient le mobilier et
-        le matériel prévus. L'analyse (test) se fait dans votre navigateur :
-        aucune image n'est envoyée ni enregistrée.
-      </p>
-      <p class="privacy">
-        Cadrez uniquement le mobilier et les équipements. Les personnes ne sont
-        ni analysées ni comptées.
-      </p>
-      <span id="model-status" class="badge wait">Chargement du modèle...</span>
-      <button id="retry" class="ghost" hidden>Réessayer le chargement</button>
+    <!-- Header Moderne Tech -->
+    <header class="top-header">
+      <div class="header-container">
+        <div class="brand-wrapper">
+          <div class="brand-icon">🏛️</div>
+          <div class="brand-text">
+            <h1>EPITA Smart Classroom</h1>
+            <p>Audit visuel intelligent & inventaire automatisé de salle de cours</p>
+          </div>
+        </div>
+        <div class="header-badges">
+          <span id="model-status" class="badge wait">Chargement de l'IA...</span>
+          <button id="retry" class="secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;" hidden>Réessayer</button>
+        </div>
+      </div>
     </header>
 
-    <main>
-      <section id="audit" class="panel">
-        <h2>1. Capturer la salle</h2>
-
-        <div class="engine-box">
-          <span class="engine-label">Moteur d'IA :</span>
-          <div class="engine-options">
-            <label
-              ><input type="radio" name="engine" value="coco" checked />
-              <b>COCO-SSD optimisé</b> (Navigateur, 100% privé, sans clé)</label
-            >
-            <label
-              ><input type="radio" name="engine" value="gemini" />
-              <b>Vision Avancée Gemini Flash</b> (Gratuit, inclut tableaux &
-              fenêtres)</label
-            >
+    <!-- Cockpit Principal en 2 Colonnes -->
+    <main class="cockpit-container">
+      
+      <!-- Colonne Gauche : Studio de Capture & Vision -->
+      <div class="cockpit-col">
+        
+        <section class="card">
+          <div class="card-title">
+            <h2>📷 Studio de Capture & Détection</h2>
+            <span class="card-badge">Vision IA</span>
           </div>
-        </div>
 
-        <div id="gemini-config" class="gemini-config" hidden>
-          <div class="gemini-row">
-            <input
-              type="password"
-              id="gemini-key"
-              placeholder="Clé Google AI Studio gratuite (AIzaSy...)"
-              autocomplete="off"
-            />
-            <button id="save-key" type="button" class="ghost">
-              Enregistrer la clé
-            </button>
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noopener"
-              class="link-hint"
-              >Obtenir une clé gratuite &rarr;</a
-            >
+          <!-- Choix du moteur IA -->
+          <div class="engine-box">
+            <div class="engine-header">Sélection du modèle de détection :</div>
+            <div class="engine-options">
+              <label class="engine-option">
+                <input type="radio" name="engine" value="coco" checked />
+                <div class="engine-info">
+                  <b>COCO-SSD Optimisé</b>
+                  <span>100% local, privé, sans inscription</span>
+                </div>
+              </label>
+              <label class="engine-option">
+                <input type="radio" name="engine" value="gemini" />
+                <div class="engine-info">
+                  <b>Vision Avancée Gemini</b>
+                  <span>Détecte aussi tableaux & fenêtres (Gratuit)</span>
+                </div>
+              </label>
+            </div>
           </div>
-          <p class="hint-small">
-            Tier gratuit Google AI Studio (sans CB requise). La clé reste
-            strictement stockée dans le navigateur.
+
+          <!-- Configuration clé Gemini si sélectionné -->
+          <div id="gemini-config" class="gemini-config" hidden>
+            <div class="gemini-row">
+              <input
+                type="password"
+                id="gemini-key"
+                placeholder="Clé Google AI Studio gratuite (AIzaSy...)"
+                autocomplete="off"
+              />
+              <button id="save-key" type="button" class="secondary">
+                Enregistrer
+              </button>
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener"
+                class="link-hint"
+                >Obtenir une clé gratuite &rarr;</a
+              >
+            </div>
+            <p class="hint-small">
+              Tier gratuit (sans CB). La clé est conservée uniquement dans votre navigateur.
+            </p>
+          </div>
+
+          <!-- Barre d'actions -->
+          <div class="actions">
+            <button id="start">▶ Démarrer caméra</button>
+            <button id="stop" class="secondary" disabled>⏹ Arrêter</button>
+            <button id="snap" disabled>⚡ Analyser l'image</button>
+            <label class="file-btn secondary">
+              📁 Importer photo
+              <input id="file" type="file" accept="image/*" hidden />
+            </label>
+          </div>
+
+          <p id="msg" class="msg" role="status"></p>
+
+          <!-- Vues Vidéo et Canvas -->
+          <div class="views-grid">
+            <div class="view-card">
+              <div class="view-card-header">
+                <span>Flux Caméra</span>
+                <span>Direct</span>
+              </div>
+              <video id="video" playsinline muted></video>
+            </div>
+            <div class="view-card">
+              <div class="view-card-header">
+                <span>Détections & Bounding Boxes</span>
+                <span id="scale-info">Traitement IA</span>
+              </div>
+              <canvas id="out" width="640" height="360"></canvas>
+            </div>
+          </div>
+
+          <!-- Seuil de sensibilité -->
+          <div class="slider-box">
+            <div class="slider-label">
+              <span>Sensibilité / Seuil de confiance :</span>
+              <b id="th-val">30 %</b>
+            </div>
+            <input id="th" type="range" min="10" max="95" value="30" />
+          </div>
+        </section>
+
+        <!-- Détections par catégorie -->
+        <section class="card">
+          <div class="card-title">
+            <h2>📦 Détections par Catégorie</h2>
+            <span class="card-badge">Inventaire Brut</span>
+          </div>
+          <div class="audit-table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Catégorie d'équipement</th>
+                  <th>Quantité détectée</th>
+                  <th>Confiance moyenne</th>
+                </tr>
+              </thead>
+              <tbody id="found">
+                <tr><td colspan="3" style="text-align:center; color:var(--text-muted); padding:1rem;">Aucune analyse pour le moment.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Colonne Droite : Dashboard d'Audit & Conformité -->
+      <div class="cockpit-col">
+        
+        <!-- KPI Dashboard -->
+        <section class="card">
+          <div class="card-title">
+            <h2>📊 Tableau de Bord Opérationnel</h2>
+            <span class="card-badge">KPI en Temps Réel</span>
+          </div>
+          <div class="kpis-grid" id="kpis">
+            <!-- Rempli dynamiquement par JS -->
+          </div>
+        </section>
+
+        <!-- Audit de Conformité (Exigence académique Fonctionnalité C) -->
+        <section class="card">
+          <div class="card-title">
+            <h2>📋 Audit de Configuration</h2>
+            <span class="card-badge">Attendu vs Détecté</span>
+          </div>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.85rem;">
+            Ajustez les quantités attendues pour auditer la conformité de la salle de cours. Les écarts sont calculés automatiquement.
           </p>
-        </div>
+          <div class="audit-table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Équipement</th>
+                  <th>Attendu</th>
+                  <th>Détecté</th>
+                  <th>Écart</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody id="rules">
+                <!-- Rempli dynamiquement par JS -->
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-        <div class="actions">
-          <button id="start">Démarrer la caméra</button>
-          <button id="stop" class="ghost" disabled>Arrêter la caméra</button>
-          <button id="snap" disabled>Analyser l'image de la caméra</button>
-          <label class="file ghost"
-            >Importer une image de test<input
-              id="file"
-              type="file"
-              accept="image/*"
-              hidden
-          /></label>
-        </div>
-        <p id="msg" class="msg" role="status"></p>
-        <div class="views">
-          <figure>
-            <figcaption>Caméra</figcaption>
-            <video id="video" playsinline muted></video>
-          </figure>
-          <figure>
-            <figcaption>Résultat de l'analyse</figcaption>
-            <canvas id="out" width="640" height="360"></canvas>
-          </figure>
-        </div>
-        <label class="slider"
-          >Seuil de confiance : <b id="th-val">30 %</b>
-          <input id="th" type="range" min="10" max="95" value="30" />
-        </label>
-      </section>
+        <!-- Rapport d'audit officiel -->
+        <section class="card">
+          <div class="card-title">
+            <h2>📄 Compte-Rendu d'Audit</h2>
+            <span class="card-badge">Livrable</span>
+          </div>
+          <div class="actions">
+            <button id="gen">Générer le rapport</button>
+            <button id="dl" class="secondary" disabled>Télécharger (.md)</button>
+          </div>
+          <pre id="report" class="report-box">Lancez une analyse, puis générez le rapport officiel.</pre>
+        </section>
 
-      <section id="dashboard" class="panel">
-        <h2>2. Tableau de bord</h2>
-        <div class="kpis" id="kpis"></div>
-      </section>
+      </div>
 
-      <section class="panel">
-        <h2>3. Audit : configuration attendue et résultats</h2>
-        <p class="hint">
-          Modifiez les quantités attendues. Un objet non détecté n'est pas
-          forcément absent : il peut être masqué, mal cadré ou inconnu du
-          modèle.
-        </p>
-        <div class="scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Catégorie</th>
-                <th>Attendu</th>
-                <th>Détecté</th>
-                <th>Écart</th>
-                <th>Statut</th>
-              </tr>
-            </thead>
-            <tbody id="rules"></tbody>
-          </table>
-        </div>
-        <h3>Objets détectés</h3>
-        <div class="scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Catégorie</th>
-                <th>Nombre</th>
-                <th>Confiance moyenne</th>
-              </tr>
-            </thead>
-            <tbody id="found"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section id="rapport" class="panel">
-        <h2>4. Rapport d'audit</h2>
-        <div class="actions">
-          <button id="gen">Générer le rapport</button>
-          <button id="dl" class="ghost" disabled>Télécharger (.md)</button>
-        </div>
-        <pre id="report" class="report">
-Lancez une analyse, puis générez le rapport.</pre
-        >
-      </section>
     </main>
+
+    <!-- Footer épuré -->
     <footer>
-      Projet pédagogique EPITA, IA for Managers. Modèle : COCO-SSD
-      (TensorFlow.js).
+      EPITA – IA FOR Managers • EPITA Smart Classroom • Omar CORTY
     </footer>
   </body>
 </html>

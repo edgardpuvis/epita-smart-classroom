@@ -412,10 +412,14 @@ function render() {
     ? Object.entries(c)
         .map(
           ([k, s]) =>
-            `<tr><td>${label(k)}</td><td>${s.length}</td><td>${Math.round((s.reduce((a, b) => a + b, 0) / s.length) * 100)} %</td></tr>`,
+            `<tr>
+              <td><b>${label(k)}</b></td>
+              <td><span class="detection-count">${s.length}</span></td>
+              <td><span class="detection-conf">${Math.round((s.reduce((a, b) => a + b, 0) / s.length) * 100)} %</span></td>
+            </tr>`,
         )
         .join("")
-    : `<tr><td colspan="3">${analysed ? "Aucune détection à ce seuil." : "Aucune analyse pour le moment."}</td></tr>`;
+    : `<tr><td colspan="3" style="text-align:center; color:var(--text-muted); padding:1rem;">${analysed ? "Aucune détection à ce seuil." : "Aucune analyse pour le moment."}</td></tr>`;
 
   // Audit de la configuration
   let ecarts = 0;
@@ -426,9 +430,21 @@ function render() {
     r.result = { n: isVerifiable ? n : "-", ...s };
     if (s.ecart) ecarts++;
     $("det" + i).textContent = r.result.n;
+
+    let gapClass = "zero";
+    if (typeof s.gap === "number") {
+      if (s.gap > 0) gapClass = "positive";
+      else if (s.gap < 0) gapClass = "negative";
+    } else if (String(s.gap).startsWith("+")) {
+      gapClass = "positive";
+    } else if (String(s.gap).startsWith("-")) {
+      gapClass = "negative";
+    }
     $("gap" + i).textContent = s.gap;
+    $("gap" + i).className = "gap-badge " + gapClass;
+
     $("st" + i).textContent = s.t;
-    $("st" + i).className = "st " + s.c;
+    $("st" + i).className = "status-chip " + s.c;
   });
 
   // Tableau de bord KPI
@@ -436,21 +452,26 @@ function render() {
     currentEngine === "gemini" ? Boolean(r.cls) : Boolean(!r.isGeminiOnly && r.cls)
   ).length;
 
-  let global = ["En attente d'analyse", "na"];
+  let global = ["En attente", "na"];
   if (analysed)
     global =
       ecarts === 0
-        ? ["Conforme sur les catégories vérifiables", "ok"]
-        : ["Écarts à contrôler", "warn"];
+        ? ["Conforme", "ok"]
+        : ["Écarts observés", "warn"];
 
-  const k = (v, l, cls = "") => `<div class="kpi ${cls}"><b>${v}</b>${l}</div>`;
+  const k = (v, l, cls = "") => `
+    <div class="kpi-card ${cls}">
+      <div class="kpi-val">${v}</div>
+      <div class="kpi-label">${l}</div>
+    </div>`;
+
   $("kpis").innerHTML =
-    k(dets.length, "objets détectés") +
-    k(Object.keys(c).length, "catégories reconnues") +
-    k(verifiables, "règles vérifiables") +
-    k(ecarts, "écarts observés", ecarts ? "warn" : "") +
-    k(global[0], "statut global", global[1]) +
-    k(analysed ? ms + " ms" : "-", "durée de l'analyse");
+    k(dets.length, "Objets Détectés") +
+    k(Object.keys(c).length, "Catégories") +
+    k(verifiables, "Règles Actives") +
+    k(ecarts, "Écarts", ecarts ? "warn" : "ok") +
+    k(global[0], "Statut Global", global[1]) +
+    k(analysed ? ms + " ms" : "-", "Temps d'inférence");
 
   window.__audit = { dets, c, ecarts, verifiables, global: global[0] };
 }
@@ -556,9 +577,13 @@ function buildReport() {
 function init() {
   $("rules").innerHTML = rules
     .map(
-      (r, i) => `<tr><td>${r.name}</td>
-    <td><input type="number" min="0" value="${r.expected}" data-i="${i}" aria-label="Quantité attendue : ${r.name}"></td>
-    <td id="det${i}">-</td><td id="gap${i}">-</td><td id="st${i}" class="st na">-</td></tr>`,
+      (r, i) => `<tr>
+        <td><b>${r.name}</b></td>
+        <td><input type="number" min="0" value="${r.expected}" data-i="${i}" aria-label="Quantité attendue : ${r.name}"></td>
+        <td id="det${i}">-</td>
+        <td id="gap${i}" class="gap-badge zero">-</td>
+        <td><span id="st${i}" class="status-chip na">-</span></td>
+      </tr>`,
     )
     .join("");
 
