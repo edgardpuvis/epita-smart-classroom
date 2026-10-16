@@ -56,8 +56,9 @@
 | 10 | Optimisation du modèle local (seuil à 30%, alias bancs/bureaux/écrans) | Haute | Fait |
 | 11 | Connecteur Vision Avancée Gemini Flash (Tier gratuit) | Moyenne | Fait |
 | 12 | Audit Multi-Angles (analyse de plusieurs photos pour 1 même audit) | Haute | Fait |
-| 13 | Historique et archivage persistant des audits (LocalStorage) | Moyenne | Fait |
-| 14 | Déploiement continu sur Cloudflare Pages et tests de validation | Haute | À finaliser |
+| 13 | Détection des anomalies d'agencement (chaises renversées / sur tables) | Haute | Fait |
+| 14 | Historique et archivage persistant des audits (LocalStorage) | Moyenne | Fait |
+| 15 | Déploiement continu sur Cloudflare Pages et tests de validation | Haute | À finaliser |
 
 ---
 
@@ -76,6 +77,7 @@
 |---|---|---|
 | Salle standard bien éclairée | Détection des chaises, tables et ordinateurs | Conforme : détections stables avec seuil à 30 % |
 | Salle avec chaises en rangées serrées | Risque de détection partielle (occlusion) | Conforme : seuil abaissé permettant d'attraper les chaises au second plan |
+| Chaise posée sur une table ou renversée | Alerte visuelle rouge avec motif hachuré et badge d'anomalie | Conforme : anomalie signalée dans le cockpit et le rapport |
 | Salle avec tableau blanc et fenêtres | Indication "Non vérifiable" en local / Détecté en mode Gemini | Conforme : transparence totale du modèle |
 | Présence d'une personne dans le champ | Aucun cadre, aucune identification, comptage exclu | Conforme : filtre strict `class !== 'person'` |
 | Refus de permission caméra | Message d'explication et bascule vers l'import d'image | Conforme : ergonomie préservée |

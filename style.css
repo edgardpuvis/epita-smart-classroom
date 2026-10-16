@@ -921,6 +921,59 @@ td input[type="number"]:focus {
   opacity: 0.6;
 }
 
+/* ---------- Anomalies d'Agencement (Chaises renversées, sur table...) ---------- */
+.anomalies-card {
+  border-left: 4px solid var(--err);
+}
+
+.anomalies-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.anomaly-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  color: #991b1b;
+  animation: fadeIn 0.2s ease;
+}
+
+.anomaly-desc {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+}
+
+.anomaly-tag {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.anomaly-angle {
+  font-size: 0.75rem;
+  color: #7f1d1d;
+  background: #fee2e2;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
 footer {
   text-align: center;
   font-size: 0.82rem;

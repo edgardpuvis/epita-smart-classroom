@@ -224,6 +224,38 @@ async function callGeminiGenerate(apiKey, base64Data, prompt) {
   throw lastErr || new Error("Aucun modèle Gemini compatible n'a pu être contacté.");
 }
 
+/* ---------- Détection Géométrique des Anomalies (COCO-SSD Local) ---------- */
+function detectGeometricAnomalies(preds) {
+  const tables = preds.filter((p) => p.class === "dining table" || p.class === "desk");
+  const chairs = preds.filter((p) => p.class === "chair" || p.class === "bench" || p.class === "couch");
+
+  chairs.forEach((c) => {
+    const [cx, cy, cw, ch] = c.bbox;
+    const chairBottom = cy + ch;
+    const chairCenterX = cx + cw / 2;
+
+    // 1. Détection : Chaise posée sur une table / bureau
+    for (const t of tables) {
+      const [tx, ty, tw, th] = t.bbox;
+      const isWithinTableX = chairCenterX >= tx - 15 && chairCenterX <= tx + tw + 15;
+      const isBaseOnTable = chairBottom >= ty - 25 && chairBottom <= ty + th * 0.75;
+      const isChairAboveFloor = cy < ty + th * 0.4;
+
+      if (isWithinTableX && isBaseOnTable && isChairAboveFloor) {
+        c.anomaly = "Chaise posée sur la table";
+        break;
+      }
+    }
+
+    // 2. Détection : Chaise renversée ou couchée au sol (largeur > hauteur de 35%)
+    if (!c.anomaly && cw > ch * 1.35 && cw > 35) {
+      c.anomaly = "Chaise renversée ou couchée";
+    }
+  });
+
+  return preds;
+}
+
 async function analyzeGemini(snapCanvas) {
   const apiKey = getGeminiKey();
   if (!apiKey) {
@@ -231,7 +263,7 @@ async function analyzeGemini(snapCanvas) {
   }
 
   const base64Data = snapCanvas.toDataURL("image/jpeg", 0.85).split(",")[1];
-  const prompt = `Tu es un système de vision par ordinateur pour l'audit d'une salle de classe.
+  const prompt = `Tu es un système expert de vision par ordinateur pour l'audit et le contrôle qualité d'une salle de classe.
 Détecte TOUS les objets visibles appartenant aux catégories suivantes :
 - "chair" : chaises, sièges scolaires, bancs, tabourets
 - "dining table" : tables, bureaux, pupitres
@@ -239,6 +271,12 @@ Détecte TOUS les objets visibles appartenant aux catégories suivantes :
 - "tv" : écrans d'ordinateur, moniteurs, télévisions, vidéoprojecteurs
 - "whiteboard" : tableaux blancs, tableaux noirs, tableaux interactifs
 - "window" : fenêtres visibles
+
+CONTRÔLE DES ANOMALIES & ÉLÉMENTS MAL PLACÉS :
+Pour chaque équipement, vérifie attentivement s'il est mal rangé ou dans une posture anormale :
+- Si une chaise est posée SUR une table ou un bureau (ex: après ménage ou désordre) : indique "anomaly": "Chaise sur la table"
+- Si une chaise est renversée, couchée au sol ou tombée : indique "anomaly": "Chaise renversée"
+- Si l'élément est normalement disposé : indique "anomaly": null
 
 RÈGLE ÉTHIQUE STRICTE : N'inclus JAMAIS les personnes ("person"). Ignore totalement toute personne présente.
 
@@ -248,7 +286,8 @@ Format de réponse obligatoire : réponds STRICTEMENT avec un objet JSON sans au
     {
       "class": "chair" | "dining table" | "laptop" | "tv" | "whiteboard" | "window",
       "score": 0.95,
-      "box_2d": [ymin, xmin, ymax, xmax]
+      "box_2d": [ymin, xmin, ymax, xmax],
+      "anomaly": null | "Chaise sur la table" | "Chaise renversée" | "Mobilier mal rangé"
     }
   ]
 }
@@ -280,7 +319,8 @@ Chaque valeur dans box_2d est un entier normalisé entre 0 et 1000 ([ymin, xmin,
       return {
         class: obj.class,
         score: typeof obj.score === "number" ? obj.score : 0.95,
-        bbox
+        bbox,
+        anomaly: obj.anomaly || null,
       };
     });
 }
@@ -327,7 +367,8 @@ async function analyze(src, w, h, customName) {
       }
       setModel("Analyse locale en cours...", "wait");
       const t = performance.now();
-      preds = await model.detect(snapCanvas, 100, 0.05);
+      const rawPreds = await model.detect(snapCanvas, 100, 0.05);
+      preds = detectGeometricAnomalies(rawPreds);
       ms = Math.round(performance.now() - t);
       setModel("Modèle prêt (COCO-SSD optimisé)", "ok");
     }
@@ -436,17 +477,29 @@ function draw() {
 
   const dets = activeView.raw.filter((d) => d.score >= threshold());
   dets.forEach((d) => {
-    const [x, y, w, h] = d.bbox,
-      color = COLORS[d.class] || COLORS.default,
-      t = `${label(d.class)} ${Math.round(d.score * 100)}%`;
+    const [x, y, w, h] = d.bbox;
+    const isAnomaly = Boolean(d.anomaly);
+    const color = isAnomaly ? "#ef4444" : (COLORS[d.class] || COLORS.default);
+    const labelText = isAnomaly
+      ? `⚠️ ${label(d.class)} [${d.anomaly}] ${Math.round(d.score * 100)}%`
+      : `${label(d.class)} ${Math.round(d.score * 100)}%`;
+
     ctx.strokeStyle = color;
+    ctx.lineWidth = isAnomaly ? lw + 2 : lw;
+    if (isAnomaly) {
+      ctx.setLineDash([6, 4]);
+    } else {
+      ctx.setLineDash([]);
+    }
     ctx.strokeRect(x, y, w, h);
-    const tw = ctx.measureText(t).width + 10;
+    ctx.setLineDash([]);
+
+    const tw = ctx.measureText(labelText).width + 10;
     const labelY = Math.max(0, y - fs - 6);
     ctx.fillStyle = color;
     ctx.fillRect(x, labelY, tw, fs + 6);
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(t, x + 5, labelY + 3);
+    ctx.fillText(labelText, x + 5, labelY + 3);
   });
 
   if ($("scale-info")) {
@@ -572,7 +625,50 @@ function render() {
     $("st" + i).className = "status-chip " + s.c;
   });
 
-  // 3. Tableau de bord KPI
+  // 3. Détection et agrégation des anomalies sur l'ensemble des angles
+  const allAnomalies = [];
+  auditViews.forEach((v) => {
+    const vDets = v.raw.filter((p) => p.score >= threshold());
+    vDets.forEach((d) => {
+      if (d.anomaly) {
+        allAnomalies.push({
+          viewName: v.name,
+          class: d.class,
+          anomaly: d.anomaly,
+          score: Math.round(d.score * 100),
+        });
+      }
+    });
+  });
+
+  const anomBadge = $("anomalies-badge");
+  const anomList = $("anomalies-list");
+  if (anomBadge) {
+    anomBadge.textContent = `${allAnomalies.length} anomalie${allAnomalies.length > 1 ? "s" : ""}`;
+    anomBadge.style.background = allAnomalies.length ? "var(--err-bg)" : "var(--ok-bg)";
+    anomBadge.style.color = allAnomalies.length ? "var(--err)" : "var(--ok)";
+  }
+  if (anomList) {
+    if (allAnomalies.length === 0) {
+      anomList.innerHTML = `<p style="color: var(--ok); font-size: 0.88rem; font-weight: 600;">✓ Aucun mobilier mal placé détecté (${auditViews.length} angle(s) vérifié(s)).</p>`;
+    } else {
+      anomList.innerHTML = allAnomalies
+        .map(
+          (a) => `
+        <div class="anomaly-item">
+          <div class="anomaly-desc">
+            <span class="anomaly-tag">⚠️ ${a.anomaly}</span>
+            <span>${label(a.class)} (${a.score}%)</span>
+          </div>
+          <span class="anomaly-angle">${a.viewName}</span>
+        </div>
+      `,
+        )
+        .join("");
+    }
+  }
+
+  // 4. Tableau de bord KPI
   const verifiables = rules.filter((r) =>
     currentEngine === "gemini" ? Boolean(r.cls) : Boolean(!r.isGeminiOnly && r.cls)
   ).length;
@@ -580,7 +676,7 @@ function render() {
   let global = ["En attente", "na"];
   if (auditViews.length) {
     global =
-      ecarts === 0
+      ecarts === 0 && allAnomalies.length === 0
         ? ["Conforme", "ok"]
         : ["Écarts observés", "warn"];
   }
@@ -591,19 +687,15 @@ function render() {
       <div class="kpi-label">${l}</div>
     </div>`;
 
-  const avgMs = auditViews.length
-    ? Math.round(auditViews.reduce((acc, v) => acc + (v.ms || 0), 0) / auditViews.length)
-    : 0;
-
   $("kpis").innerHTML =
     k(totalDets, "Objets Cumulés") +
     k(Object.keys(c).length, "Catégories") +
     k(auditViews.length, "Angles Analysés") +
+    k(allAnomalies.length, "Anomalies", allAnomalies.length ? "err" : "ok") +
     k(ecarts, "Écarts", ecarts ? "warn" : "ok") +
-    k(global[0], "Statut Global", global[1]) +
-    k(auditViews.length ? avgMs + " ms" : "-", "Temps moyen / vue");
+    k(global[0], "Statut Global", global[1]);
 
-  window.__audit = { detsCount: totalDets, c, ecarts, verifiables, global: global[0] };
+  window.__audit = { detsCount: totalDets, c, ecarts, allAnomalies, verifiables, global: global[0] };
 
   // Activation des boutons d'actions
   const hasViews = auditViews.length > 0;
@@ -676,6 +768,21 @@ function buildReport() {
     .forEach((r) =>
       L.push(`- ${r.name} : attendu ${r.expected}, détecté ${r.result.n} (écart : ${r.result.gap}).`),
     );
+
+  const { allAnomalies } = window.__audit;
+  L.push(
+    "",
+    "## Contrôle d'agencement et anomalies de disposition",
+  );
+  if (allAnomalies && allAnomalies.length) {
+    L.push(`${allAnomalies.length} anomalie(s) de rangement détectée(s) :`);
+    allAnomalies.forEach((a) => {
+      L.push(`- **${a.anomaly}** : ${label(a.class)} repérée sur ${a.viewName} (confiance ${a.score} %).`);
+    });
+    L.push("Recommandation : Réordonner le mobilier signalé avant le début de la session de cours.");
+  } else {
+    L.push("✓ Aucun mobilier mal placé, renversé ou posé sur une table n'a été détecté.");
+  }
 
   const nonSup = rules
     .filter((r) => currentEngine === "coco" ? (r.isGeminiOnly || !r.cls) : !r.cls)
