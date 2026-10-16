@@ -15,7 +15,10 @@
           <div class="brand-icon">🏛️</div>
           <div class="brand-text">
             <h1>EPITA Smart Classroom</h1>
-            <p>Audit visuel intelligent, inventaire complet & détection d'anomalies de salle</p>
+            <p>
+              Audit visuel intelligent, inventaire complet & détection
+              d'anomalies de salle
+            </p>
           </div>
         </div>
         <div class="header-badges">
@@ -26,10 +29,8 @@
 
     <!-- Cockpit Principal en 2 Colonnes -->
     <main class="cockpit-container">
-      
       <!-- Colonne Gauche : Studio de Capture & Vision -->
       <div class="cockpit-col">
-        
         <section class="card">
           <div class="card-title">
             <h2>📷 Studio de Capture & Vision IA</h2>
@@ -39,7 +40,16 @@
           <!-- Configuration clé Vision IA -->
           <div id="gemini-config" class="gemini-config">
             <div class="gemini-row">
-              <span style="font-size:0.85rem; font-weight:700; color:#1e1b4b; display:flex; align-items:center; gap:0.35rem;">
+              <span
+                style="
+                  font-size: 0.85rem;
+                  font-weight: 700;
+                  color: #1e1b4b;
+                  display: flex;
+                  align-items: center;
+                  gap: 0.35rem;
+                "
+              >
                 🔑 Clé Vision IA :
               </span>
               <input
@@ -60,7 +70,8 @@
               >
             </div>
             <p class="hint-small">
-              Tier 100% gratuit Google AI Studio (sans CB requise). La clé reste conservée localement dans votre navigateur.
+              Tier 100% gratuit Google AI Studio (sans CB requise). La clé reste
+              conservée localement dans votre navigateur.
             </p>
           </div>
 
@@ -121,7 +132,14 @@
                 <b id="views-count" class="meta-info">0 angle</b>
               </div>
               <div class="views-strip-actions">
-                <button id="reset-audit" type="button" class="secondary btn-sm" title="Effacer les captures actuelles et démarrer un nouvel audit">↺ Nouvel Audit</button>
+                <button
+                  id="reset-audit"
+                  type="button"
+                  class="secondary btn-sm"
+                  title="Effacer les captures actuelles et démarrer un nouvel audit"
+                >
+                  ↺ Nouvel Audit
+                </button>
               </div>
             </div>
             <div id="views-strip" class="views-strip"></div>
@@ -144,17 +162,26 @@
                 </tr>
               </thead>
               <tbody id="found">
-                <tr><td colspan="3" style="text-align:center; color:var(--text-muted); padding:1rem;">Aucune analyse pour le moment.</td></tr>
+                <tr>
+                  <td
+                    colspan="3"
+                    style="
+                      text-align: center;
+                      color: var(--text-muted);
+                      padding: 1rem;
+                    "
+                  >
+                    Aucune analyse pour le moment.
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
         </section>
-
       </div>
 
       <!-- Colonne Droite : Dashboard d'Audit & Conformité -->
       <div class="cockpit-col">
-        
         <!-- KPI Dashboard -->
         <section class="card">
           <div class="card-title">
@@ -172,8 +199,15 @@
             <h2>📋 Audit de Configuration Globale</h2>
             <span class="card-badge">Attendu vs Détecté</span>
           </div>
-          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.85rem;">
-            Ajustez les quantités attendues pour auditer la conformité de la salle sur l'ensemble des angles analysés.
+          <p
+            style="
+              font-size: 0.82rem;
+              color: var(--text-muted);
+              margin-bottom: 0.85rem;
+            "
+          >
+            Ajustez les quantités attendues pour auditer la conformité de la
+            salle sur l'ensemble des angles analysés.
           </p>
           <div class="audit-table-wrapper">
             <table>
@@ -199,11 +233,20 @@
             <h2>⚠️ Contrôle de Rangement & Anomalies</h2>
             <span class="card-badge" id="anomalies-badge">0 anomalie</span>
           </div>
-          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.85rem;">
-            Détection automatique des mobiliers mal placés ou suspects (chaises renversées, chaises posées sur les tables).
+          <p
+            style="
+              font-size: 0.82rem;
+              color: var(--text-muted);
+              margin-bottom: 0.85rem;
+            "
+          >
+            Détection automatique des mobiliers mal placés ou suspects (chaises
+            renversées, chaises posées sur les tables).
           </p>
           <div id="anomalies-list" class="anomalies-container">
-            <p style="color: var(--ok); font-size: 0.88rem; font-weight: 600;">✓ Aucun mobilier mal placé détecté.</p>
+            <p style="color: var(--ok); font-size: 0.88rem; font-weight: 600">
+              ✓ Aucun mobilier mal placé détecté.
+            </p>
           </div>
         </section>
 
@@ -215,14 +258,18 @@
           </div>
           <div class="actions">
             <button id="gen">Générer le rapport</button>
-            <button id="dl" class="secondary" disabled>Télécharger (.md)</button>
-            <button id="save-audit" class="secondary" disabled>💾 Sauvegarder dans l'historique</button>
+            <button id="dl" class="secondary" disabled>
+              Télécharger (.md)
+            </button>
+            <button id="save-audit" class="secondary" disabled>
+              💾 Sauvegarder dans l'historique
+            </button>
           </div>
-          <pre id="report" class="report-box">Lancez une analyse, puis générez le rapport officiel.</pre>
+          <pre id="report" class="report-box">
+Lancez une analyse, puis générez le rapport officiel.</pre
+          >
         </section>
-
       </div>
-
     </main>
 
     <!-- Historique des Audits Enregistrés -->
@@ -230,7 +277,9 @@
       <div class="history-card">
         <div class="history-header">
           <h2>📁 Historique des Audits Enregistrés</h2>
-          <button id="clear-history" type="button" class="btn-sm btn-danger">🗑 Vider l'historique</button>
+          <button id="clear-history" type="button" class="btn-sm btn-danger">
+            🗑 Vider l'historique
+          </button>
         </div>
         <div class="audit-table-wrapper">
           <table>
@@ -254,8 +303,6 @@
     </section>
 
     <!-- Footer épuré -->
-    <footer>
-      EPITA – IA FOR Managers • EPITA Smart Classroom • Omar CORTY
-    </footer>
+    <footer>EPITA – IA FOR Managers • EPITA Smart Classroom</footer>
   </body>
 </html>
